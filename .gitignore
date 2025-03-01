@@ -1,0 +1,37 @@
+# Hyperledger Fabric specific
+/channel-artifacts/*.block
+/channel-artifacts/*.tx
+/organizations/fabric-ca/*/msp/keystore/*
+/organizations/ordererOrganizations/*/msp/keystore/*
+/organizations/peerOrganizations/*/msp/keystore/*
+/organizations/ordererOrganizations/*/orderers/*/msp/keystore/*
+/organizations/peerOrganizations/*/peers/*/msp/keystore/*
+/organizations/peerOrganizations/*/users/*/msp/keystore/*
+
+# Docker volumes
+/volumes
+
+# Generated folders
+/ledgers
+/ledgers-backup
+
+# Node.js dependencies
+node_modules/
+npm-debug.log
+package-lock.json
+
+# IDE files
+.idea/
+*.swp
+*.swo
+.DS_Store
+.vscode/
+
+# Log files
+*.log
+
+# Docker files
+.dockerignore
+
+# Chaincode packaged files
+*.tar.gz
