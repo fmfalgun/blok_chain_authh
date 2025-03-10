@@ -69,7 +69,7 @@ CLIENT_INFO=$(peer chaincode query -C $CHANNEL_NAME -n $CC_NAME -c "{\"function\
 echo "Client info: $CLIENT_INFO"
 
 # Extract the TGT for later use
-TGT=$(echo $CLIENT_INFO | grep -o "\"tgt\":\"[^\"]*\"" | cut -d':' -f2 | tr -d '",')
+TGT=$(echo $CLIENT_INFO | grep -o "\"tgt\":\"[^\"]*\"" | sed 's/"tgt":"//;s/"//')
 echo "Retrieved TGT: $TGT"
 
 # 2. Test TGS (Org2) Functions
@@ -98,7 +98,7 @@ CLIENT_INFO=$(peer chaincode query -C $CHANNEL_NAME -n $CC_NAME -c "{\"function\
 echo $CLIENT_INFO
 
 # Extract the Service Ticket for later use
-SERVICE_TICKET=$(echo $CLIENT_INFO | grep -o "\"serviceTicket\":\"[^\"]*\"" | cut -d':' -f2 | tr -d '",')
+SERVICE_TICKET=$(echo $CLIENT_INFO | grep -o "\"serviceTicket\":\"[^\"]*\"" | sed 's/"serviceTicket":"//;s/"//')
 echo "Retrieved Service Ticket: $SERVICE_TICKET"
 
 # 3. Test ISV (Org3) Functions

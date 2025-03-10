@@ -1,3 +1,32 @@
+#!/bin/bash
+
+# Exit on first error
+set -e
+
+echo "===== Preparing for Chaincode Deployment ====="
+
+# Set environment variables for peer commands
+export CORE_PEER_TLS_ENABLED=true
+export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+export PEER0_ORG1_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+export PEER0_ORG2_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+export PEER0_ORG3_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
+
+# Define variables
+CHANNEL_NAME="chaichis-channel"
+CC_SRC_PATH="/opt/gopath/src/github.com/chaincode/iot-auth/go"
+CC_NAME="iot-auth"
+CC_VERSION="1.0"
+CC_SEQUENCE="1"
+CC_INIT_FCN="InitLedger"
+
+# Create chaincode directory if it doesn't exist
+echo "Creating chaincode directory structure..."
+mkdir -p $CC_SRC_PATH
+
+# Step 1: Create the chaincode file
+echo "Creating chaincode file..."
+cat > $CC_SRC_PATH/iot-auth.go << 'CODEEOF'
 package main
 
 import (
@@ -643,3 +672,129 @@ func main() {
 		fmt.Printf("Error starting IoT authentication chaincode: %v\n", err)
 	}
 }
+CODEEOF
+
+# Step 2: Create the go.mod file
+echo "Creating go.mod file..."
+cat > $CC_SRC_PATH/go.mod << 'MODEOF'
+module github.com/falgunmarothia/iot-auth
+
+go 1.16
+
+require (
+	github.com/hyperledger/fabric-chaincode-go v0.0.0-20220131132609-1476cf1d3206
+	github.com/hyperledger/fabric-contract-api-go v1.1.1
+)
+MODEOF
+
+# Initialize the Go module and download dependencies
+echo "Initializing Go module and downloading dependencies..."
+cd $CC_SRC_PATH
+go mod tidy
+cd -
+
+# Function to set environment variables for each organization
+setOrg1Env() {
+  export CORE_PEER_LOCALMSPID="Org1MSP"
+  export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG1_CA
+  export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+}
+
+setOrg2Env() {
+  export CORE_PEER_LOCALMSPID="Org2MSP"
+  export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG2_CA
+  export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+}
+
+setOrg3Env() {
+  export CORE_PEER_LOCALMSPID="Org3MSP"
+  export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG3_CA
+  export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
+}
+
+# Package the chaincode
+echo "Packaging chaincode..."
+peer lifecycle chaincode package ${CC_NAME}.tar.gz --path ${CC_SRC_PATH} --lang golang --label ${CC_NAME}_${CC_VERSION}
+
+# Install chaincode on all peers
+echo "Installing chaincode on peer0.org1.example.com..."
+setOrg1Env
+export CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer1.org1.example.com..."
+export CORE_PEER_ADDRESS=peer1.org1.example.com:8051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer2.org1.example.com..."
+export CORE_PEER_ADDRESS=peer2.org1.example.com:11051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer0.org2.example.com..."
+setOrg2Env
+export CORE_PEER_ADDRESS=peer0.org2.example.com:9051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer1.org2.example.com..."
+export CORE_PEER_ADDRESS=peer1.org2.example.com:10051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer2.org2.example.com..."
+export CORE_PEER_ADDRESS=peer2.org2.example.com:12051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer0.org3.example.com..."
+setOrg3Env
+export CORE_PEER_ADDRESS=peer0.org3.example.com:13051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer1.org3.example.com..."
+export CORE_PEER_ADDRESS=peer1.org3.example.com:14051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+echo "Installing chaincode on peer2.org3.example.com..."
+export CORE_PEER_ADDRESS=peer2.org3.example.com:15051
+peer lifecycle chaincode install ${CC_NAME}.tar.gz
+
+# Get package ID for the installed chaincode
+echo "Getting package ID..."
+setOrg1Env
+export CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+PACKAGE_ID=$(peer lifecycle chaincode queryinstalled | grep "${CC_NAME}_${CC_VERSION}" | awk '{print $3}' | cut -d ',' -f 1)
+echo "Package ID is ${PACKAGE_ID}"
+
+# Approve chaincode definition for Org1
+echo "Approving chaincode definition for Org1..."
+setOrg1Env
+export CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+peer lifecycle chaincode approveformyorg -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --package-id ${PACKAGE_ID} --sequence ${CC_SEQUENCE} --tls --cafile $ORDERER_CA
+
+# Approve chaincode definition for Org2
+echo "Approving chaincode definition for Org2..."
+setOrg2Env
+export CORE_PEER_ADDRESS=peer0.org2.example.com:9051
+peer lifecycle chaincode approveformyorg -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --package-id ${PACKAGE_ID} --sequence ${CC_SEQUENCE} --tls --cafile $ORDERER_CA
+
+# Approve chaincode definition for Org3
+echo "Approving chaincode definition for Org3..."
+setOrg3Env
+export CORE_PEER_ADDRESS=peer0.org3.example.com:13051
+peer lifecycle chaincode approveformyorg -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --package-id ${PACKAGE_ID} --sequence ${CC_SEQUENCE} --tls --cafile $ORDERER_CA
+
+# Check commit readiness
+echo "Checking commit readiness..."
+peer lifecycle chaincode checkcommitreadiness --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --sequence ${CC_SEQUENCE} --tls --cafile $ORDERER_CA --output json
+
+# Commit chaincode definition
+echo "Committing chaincode definition..."
+peer lifecycle chaincode commit -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --channelID $CHANNEL_NAME --name ${CC_NAME} --version ${CC_VERSION} --sequence ${CC_SEQUENCE} --tls --cafile $ORDERER_CA --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles $PEER0_ORG1_CA --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles $PEER0_ORG2_CA --peerAddresses peer0.org3.example.com:13051 --tlsRootCertFiles $PEER0_ORG3_CA
+
+# Query committed chaincode
+echo "Querying committed chaincode..."
+peer lifecycle chaincode querycommitted --channelID $CHANNEL_NAME --name ${CC_NAME} --cafile $ORDERER_CA
+
+# Initialize the chaincode
+echo "Initializing chaincode..."
+peer chaincode invoke -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C $CHANNEL_NAME -n ${CC_NAME} --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles $PEER0_ORG1_CA --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles $PEER0_ORG2_CA --peerAddresses peer0.org3.example.com:13051 --tlsRootCertFiles $PEER0_ORG3_CA -c '{"function":"InitLedger","Args":[]}'
+
+echo "===== Chaincode deployment completed ====="

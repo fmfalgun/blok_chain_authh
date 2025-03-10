@@ -1,0 +1,706 @@
+.
+├── chaincodes
+├── channel-artifacts
+│   ├── chaichis-channel.tx
+│   ├── channel.tx
+│   ├── genesis.block
+│   ├── Org1MSPanchors.tx
+│   ├── Org2MSPanchors.tx
+│   └── Org3MSPanchors.tx
+├── configtx.yaml
+├── crypto-config
+│   ├── ordererOrganizations
+│   │   └── example.com
+│   │       ├── ca
+│   │       │   ├── ca.example.com-cert.pem
+│   │       │   └── priv_sk
+│   │       ├── msp
+│   │       │   ├── admincerts
+│   │       │   │   └── Admin@example.com-cert.pem
+│   │       │   ├── cacerts
+│   │       │   │   └── ca.example.com-cert.pem
+│   │       │   └── tlscacerts
+│   │       │       └── tlsca.example.com-cert.pem
+│   │       ├── orderers
+│   │       │   └── orderer.example.com
+│   │       │       ├── msp
+│   │       │       │   ├── admincerts
+│   │       │       │   │   └── Admin@example.com-cert.pem
+│   │       │       │   ├── cacerts
+│   │       │       │   │   └── ca.example.com-cert.pem
+│   │       │       │   ├── keystore
+│   │       │       │   │   └── priv_sk
+│   │       │       │   ├── signcerts
+│   │       │       │   │   └── orderer.example.com-cert.pem
+│   │       │       │   └── tlscacerts
+│   │       │       │       └── tlsca.example.com-cert.pem
+│   │       │       └── tls
+│   │       │           ├── ca.crt
+│   │       │           ├── server.crt
+│   │       │           └── server.key
+│   │       ├── tlsca
+│   │       │   ├── priv_sk
+│   │       │   └── tlsca.example.com-cert.pem
+│   │       └── users
+│   │           └── Admin@example.com
+│   │               ├── msp
+│   │               │   ├── admincerts
+│   │               │   │   └── Admin@example.com-cert.pem
+│   │               │   ├── cacerts
+│   │               │   │   └── ca.example.com-cert.pem
+│   │               │   ├── keystore
+│   │               │   │   └── priv_sk
+│   │               │   ├── signcerts
+│   │               │   │   └── Admin@example.com-cert.pem
+│   │               │   └── tlscacerts
+│   │               │       └── tlsca.example.com-cert.pem
+│   │               └── tls
+│   │                   ├── ca.crt
+│   │                   ├── client.crt
+│   │                   └── client.key
+│   └── peerOrganizations
+│       ├── org1.example.com
+│       │   ├── ca
+│       │   │   ├── ca.org1.example.com-cert.pem
+│       │   │   └── priv_sk
+│       │   ├── msp
+│       │   │   ├── admincerts
+│       │   │   ├── cacerts
+│       │   │   │   └── ca.org1.example.com-cert.pem
+│       │   │   ├── config.yaml
+│       │   │   └── tlscacerts
+│       │   │       └── tlsca.org1.example.com-cert.pem
+│       │   ├── peers
+│       │   │   ├── peer0.org1.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org1.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer0.org1.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org1.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   ├── peer1.org1.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org1.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer1.org1.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org1.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   └── peer2.org1.example.com
+│       │   │       ├── msp
+│       │   │       │   ├── admincerts
+│       │   │       │   ├── cacerts
+│       │   │       │   │   └── ca.org1.example.com-cert.pem
+│       │   │       │   ├── config.yaml
+│       │   │       │   ├── keystore
+│       │   │       │   │   └── priv_sk
+│       │   │       │   ├── signcerts
+│       │   │       │   │   └── peer2.org1.example.com-cert.pem
+│       │   │       │   └── tlscacerts
+│       │   │       │       └── tlsca.org1.example.com-cert.pem
+│       │   │       └── tls
+│       │   │           ├── ca.crt
+│       │   │           ├── server.crt
+│       │   │           └── server.key
+│       │   ├── tlsca
+│       │   │   ├── priv_sk
+│       │   │   └── tlsca.org1.example.com-cert.pem
+│       │   └── users
+│       │       ├── Admin@org1.example.com
+│       │       │   ├── msp
+│       │       │   │   ├── admincerts
+│       │       │   │   ├── cacerts
+│       │       │   │   │   └── ca.org1.example.com-cert.pem
+│       │       │   │   ├── config.yaml
+│       │       │   │   ├── keystore
+│       │       │   │   │   └── priv_sk
+│       │       │   │   ├── signcerts
+│       │       │   │   │   └── Admin@org1.example.com-cert.pem
+│       │       │   │   └── tlscacerts
+│       │       │   │       └── tlsca.org1.example.com-cert.pem
+│       │       │   └── tls
+│       │       │       ├── ca.crt
+│       │       │       ├── client.crt
+│       │       │       └── client.key
+│       │       └── User1@org1.example.com
+│       │           ├── msp
+│       │           │   ├── admincerts
+│       │           │   ├── cacerts
+│       │           │   │   └── ca.org1.example.com-cert.pem
+│       │           │   ├── config.yaml
+│       │           │   ├── keystore
+│       │           │   │   └── priv_sk
+│       │           │   ├── signcerts
+│       │           │   │   └── User1@org1.example.com-cert.pem
+│       │           │   └── tlscacerts
+│       │           │       └── tlsca.org1.example.com-cert.pem
+│       │           └── tls
+│       │               ├── ca.crt
+│       │               ├── client.crt
+│       │               └── client.key
+│       ├── org2.example.com
+│       │   ├── ca
+│       │   │   ├── ca.org2.example.com-cert.pem
+│       │   │   └── priv_sk
+│       │   ├── msp
+│       │   │   ├── admincerts
+│       │   │   ├── cacerts
+│       │   │   │   └── ca.org2.example.com-cert.pem
+│       │   │   ├── config.yaml
+│       │   │   └── tlscacerts
+│       │   │       └── tlsca.org2.example.com-cert.pem
+│       │   ├── peers
+│       │   │   ├── peer0.org2.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org2.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer0.org2.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org2.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   ├── peer1.org2.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org2.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer1.org2.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org2.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   └── peer2.org2.example.com
+│       │   │       ├── msp
+│       │   │       │   ├── admincerts
+│       │   │       │   ├── cacerts
+│       │   │       │   │   └── ca.org2.example.com-cert.pem
+│       │   │       │   ├── config.yaml
+│       │   │       │   ├── keystore
+│       │   │       │   │   └── priv_sk
+│       │   │       │   ├── signcerts
+│       │   │       │   │   └── peer2.org2.example.com-cert.pem
+│       │   │       │   └── tlscacerts
+│       │   │       │       └── tlsca.org2.example.com-cert.pem
+│       │   │       └── tls
+│       │   │           ├── ca.crt
+│       │   │           ├── server.crt
+│       │   │           └── server.key
+│       │   ├── tlsca
+│       │   │   ├── priv_sk
+│       │   │   └── tlsca.org2.example.com-cert.pem
+│       │   └── users
+│       │       ├── Admin@org2.example.com
+│       │       │   ├── msp
+│       │       │   │   ├── admincerts
+│       │       │   │   ├── cacerts
+│       │       │   │   │   └── ca.org2.example.com-cert.pem
+│       │       │   │   ├── config.yaml
+│       │       │   │   ├── keystore
+│       │       │   │   │   └── priv_sk
+│       │       │   │   ├── signcerts
+│       │       │   │   │   └── Admin@org2.example.com-cert.pem
+│       │       │   │   └── tlscacerts
+│       │       │   │       └── tlsca.org2.example.com-cert.pem
+│       │       │   └── tls
+│       │       │       ├── ca.crt
+│       │       │       ├── client.crt
+│       │       │       └── client.key
+│       │       └── User1@org2.example.com
+│       │           ├── msp
+│       │           │   ├── admincerts
+│       │           │   ├── cacerts
+│       │           │   │   └── ca.org2.example.com-cert.pem
+│       │           │   ├── config.yaml
+│       │           │   ├── keystore
+│       │           │   │   └── priv_sk
+│       │           │   ├── signcerts
+│       │           │   │   └── User1@org2.example.com-cert.pem
+│       │           │   └── tlscacerts
+│       │           │       └── tlsca.org2.example.com-cert.pem
+│       │           └── tls
+│       │               ├── ca.crt
+│       │               ├── client.crt
+│       │               └── client.key
+│       └── org3.example.com
+│           ├── ca
+│           │   ├── ca.org3.example.com-cert.pem
+│           │   └── priv_sk
+│           ├── msp
+│           │   ├── admincerts
+│           │   ├── cacerts
+│           │   │   └── ca.org3.example.com-cert.pem
+│           │   ├── config.yaml
+│           │   └── tlscacerts
+│           │       └── tlsca.org3.example.com-cert.pem
+│           ├── peers
+│           │   ├── peer0.org3.example.com
+│           │   │   ├── msp
+│           │   │   │   ├── admincerts
+│           │   │   │   ├── cacerts
+│           │   │   │   │   └── ca.org3.example.com-cert.pem
+│           │   │   │   ├── config.yaml
+│           │   │   │   ├── keystore
+│           │   │   │   │   └── priv_sk
+│           │   │   │   ├── signcerts
+│           │   │   │   │   └── peer0.org3.example.com-cert.pem
+│           │   │   │   └── tlscacerts
+│           │   │   │       └── tlsca.org3.example.com-cert.pem
+│           │   │   └── tls
+│           │   │       ├── ca.crt
+│           │   │       ├── server.crt
+│           │   │       └── server.key
+│           │   ├── peer1.org3.example.com
+│           │   │   ├── msp
+│           │   │   │   ├── admincerts
+│           │   │   │   ├── cacerts
+│           │   │   │   │   └── ca.org3.example.com-cert.pem
+│           │   │   │   ├── config.yaml
+│           │   │   │   ├── keystore
+│           │   │   │   │   └── priv_sk
+│           │   │   │   ├── signcerts
+│           │   │   │   │   └── peer1.org3.example.com-cert.pem
+│           │   │   │   └── tlscacerts
+│           │   │   │       └── tlsca.org3.example.com-cert.pem
+│           │   │   └── tls
+│           │   │       ├── ca.crt
+│           │   │       ├── server.crt
+│           │   │       └── server.key
+│           │   └── peer2.org3.example.com
+│           │       ├── msp
+│           │       │   ├── admincerts
+│           │       │   ├── cacerts
+│           │       │   │   └── ca.org3.example.com-cert.pem
+│           │       │   ├── config.yaml
+│           │       │   ├── keystore
+│           │       │   │   └── priv_sk
+│           │       │   ├── signcerts
+│           │       │   │   └── peer2.org3.example.com-cert.pem
+│           │       │   └── tlscacerts
+│           │       │       └── tlsca.org3.example.com-cert.pem
+│           │       └── tls
+│           │           ├── ca.crt
+│           │           ├── server.crt
+│           │           └── server.key
+│           ├── tlsca
+│           │   ├── priv_sk
+│           │   └── tlsca.org3.example.com-cert.pem
+│           └── users
+│               ├── Admin@org3.example.com
+│               │   ├── msp
+│               │   │   ├── admincerts
+│               │   │   ├── cacerts
+│               │   │   │   └── ca.org3.example.com-cert.pem
+│               │   │   ├── config.yaml
+│               │   │   ├── keystore
+│               │   │   │   └── priv_sk
+│               │   │   ├── signcerts
+│               │   │   │   └── Admin@org3.example.com-cert.pem
+│               │   │   └── tlscacerts
+│               │   │       └── tlsca.org3.example.com-cert.pem
+│               │   └── tls
+│               │       ├── ca.crt
+│               │       ├── client.crt
+│               │       └── client.key
+│               └── User1@org3.example.com
+│                   ├── msp
+│                   │   ├── admincerts
+│                   │   ├── cacerts
+│                   │   │   └── ca.org3.example.com-cert.pem
+│                   │   ├── config.yaml
+│                   │   ├── keystore
+│                   │   │   └── priv_sk
+│                   │   ├── signcerts
+│                   │   │   └── User1@org3.example.com-cert.pem
+│                   │   └── tlscacerts
+│                   │       └── tlsca.org3.example.com-cert.pem
+│                   └── tls
+│                       ├── ca.crt
+│                       ├── client.crt
+│                       └── client.key
+├── crypto-config.yaml
+├── docker-compose.yaml
+├── file_str.txt
+├── organizations
+│   ├── ordererOrganizations
+│   │   └── example.com
+│   │       ├── ca
+│   │       │   ├── ca.example.com-cert.pem
+│   │       │   ├── ca.orderer.example.com-cert.pem
+│   │       │   └── priv_sk
+│   │       ├── msp
+│   │       │   ├── admincerts
+│   │       │   │   └── Admin@example.com-cert.pem
+│   │       │   ├── cacerts
+│   │       │   │   └── ca.example.com-cert.pem
+│   │       │   └── tlscacerts
+│   │       │       └── tlsca.example.com-cert.pem
+│   │       ├── orderers
+│   │       │   └── orderer.example.com
+│   │       │       ├── msp
+│   │       │       │   ├── admincerts
+│   │       │       │   │   └── Admin@example.com-cert.pem
+│   │       │       │   ├── cacerts
+│   │       │       │   │   └── ca.example.com-cert.pem
+│   │       │       │   ├── keystore
+│   │       │       │   │   └── priv_sk
+│   │       │       │   ├── signcerts
+│   │       │       │   │   └── orderer.example.com-cert.pem
+│   │       │       │   └── tlscacerts
+│   │       │       │       └── tlsca.example.com-cert.pem
+│   │       │       └── tls
+│   │       │           ├── ca.crt
+│   │       │           ├── server.crt
+│   │       │           └── server.key
+│   │       ├── tlsca
+│   │       │   ├── priv_sk
+│   │       │   └── tlsca.example.com-cert.pem
+│   │       └── users
+│   │           └── Admin@example.com
+│   │               ├── msp
+│   │               │   ├── admincerts
+│   │               │   │   └── Admin@example.com-cert.pem
+│   │               │   ├── cacerts
+│   │               │   │   └── ca.example.com-cert.pem
+│   │               │   ├── keystore
+│   │               │   │   └── priv_sk
+│   │               │   ├── signcerts
+│   │               │   │   └── Admin@example.com-cert.pem
+│   │               │   └── tlscacerts
+│   │               │       └── tlsca.example.com-cert.pem
+│   │               └── tls
+│   │                   ├── ca.crt
+│   │                   ├── client.crt
+│   │                   └── client.key
+│   └── peerOrganizations
+│       ├── org1.example.com
+│       │   ├── ca
+│       │   │   ├── ca.org1.example.com-cert.pem
+│       │   │   └── priv_sk
+│       │   ├── msp
+│       │   │   ├── admincerts
+│       │   │   ├── cacerts
+│       │   │   │   └── ca.org1.example.com-cert.pem
+│       │   │   ├── config.yaml
+│       │   │   └── tlscacerts
+│       │   │       └── tlsca.org1.example.com-cert.pem
+│       │   ├── peers
+│       │   │   ├── peer0.org1.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org1.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer0.org1.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org1.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   ├── peer1.org1.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org1.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer1.org1.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org1.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   └── peer2.org1.example.com
+│       │   │       ├── msp
+│       │   │       │   ├── admincerts
+│       │   │       │   ├── cacerts
+│       │   │       │   │   └── ca.org1.example.com-cert.pem
+│       │   │       │   ├── config.yaml
+│       │   │       │   ├── keystore
+│       │   │       │   │   └── priv_sk
+│       │   │       │   ├── signcerts
+│       │   │       │   │   └── peer2.org1.example.com-cert.pem
+│       │   │       │   └── tlscacerts
+│       │   │       │       └── tlsca.org1.example.com-cert.pem
+│       │   │       └── tls
+│       │   │           ├── ca.crt
+│       │   │           ├── server.crt
+│       │   │           └── server.key
+│       │   ├── tlsca
+│       │   │   ├── priv_sk
+│       │   │   └── tlsca.org1.example.com-cert.pem
+│       │   └── users
+│       │       ├── Admin@org1.example.com
+│       │       │   ├── msp
+│       │       │   │   ├── admincerts
+│       │       │   │   ├── cacerts
+│       │       │   │   │   └── ca.org1.example.com-cert.pem
+│       │       │   │   ├── config.yaml
+│       │       │   │   ├── keystore
+│       │       │   │   │   └── priv_sk
+│       │       │   │   ├── signcerts
+│       │       │   │   │   └── Admin@org1.example.com-cert.pem
+│       │       │   │   └── tlscacerts
+│       │       │   │       └── tlsca.org1.example.com-cert.pem
+│       │       │   └── tls
+│       │       │       ├── ca.crt
+│       │       │       ├── client.crt
+│       │       │       └── client.key
+│       │       └── User1@org1.example.com
+│       │           ├── msp
+│       │           │   ├── admincerts
+│       │           │   ├── cacerts
+│       │           │   │   └── ca.org1.example.com-cert.pem
+│       │           │   ├── config.yaml
+│       │           │   ├── keystore
+│       │           │   │   └── priv_sk
+│       │           │   ├── signcerts
+│       │           │   │   └── User1@org1.example.com-cert.pem
+│       │           │   └── tlscacerts
+│       │           │       └── tlsca.org1.example.com-cert.pem
+│       │           └── tls
+│       │               ├── ca.crt
+│       │               ├── client.crt
+│       │               └── client.key
+│       ├── org2.example.com
+│       │   ├── ca
+│       │   │   ├── ca.org2.example.com-cert.pem
+│       │   │   └── priv_sk
+│       │   ├── msp
+│       │   │   ├── admincerts
+│       │   │   ├── cacerts
+│       │   │   │   └── ca.org2.example.com-cert.pem
+│       │   │   ├── config.yaml
+│       │   │   └── tlscacerts
+│       │   │       └── tlsca.org2.example.com-cert.pem
+│       │   ├── peers
+│       │   │   ├── peer0.org2.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org2.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer0.org2.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org2.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   ├── peer1.org2.example.com
+│       │   │   │   ├── msp
+│       │   │   │   │   ├── admincerts
+│       │   │   │   │   ├── cacerts
+│       │   │   │   │   │   └── ca.org2.example.com-cert.pem
+│       │   │   │   │   ├── config.yaml
+│       │   │   │   │   ├── keystore
+│       │   │   │   │   │   └── priv_sk
+│       │   │   │   │   ├── signcerts
+│       │   │   │   │   │   └── peer1.org2.example.com-cert.pem
+│       │   │   │   │   └── tlscacerts
+│       │   │   │   │       └── tlsca.org2.example.com-cert.pem
+│       │   │   │   └── tls
+│       │   │   │       ├── ca.crt
+│       │   │   │       ├── server.crt
+│       │   │   │       └── server.key
+│       │   │   └── peer2.org2.example.com
+│       │   │       ├── msp
+│       │   │       │   ├── admincerts
+│       │   │       │   ├── cacerts
+│       │   │       │   │   └── ca.org2.example.com-cert.pem
+│       │   │       │   ├── config.yaml
+│       │   │       │   ├── keystore
+│       │   │       │   │   └── priv_sk
+│       │   │       │   ├── signcerts
+│       │   │       │   │   └── peer2.org2.example.com-cert.pem
+│       │   │       │   └── tlscacerts
+│       │   │       │       └── tlsca.org2.example.com-cert.pem
+│       │   │       └── tls
+│       │   │           ├── ca.crt
+│       │   │           ├── server.crt
+│       │   │           └── server.key
+│       │   ├── tlsca
+│       │   │   ├── priv_sk
+│       │   │   └── tlsca.org2.example.com-cert.pem
+│       │   └── users
+│       │       ├── Admin@org2.example.com
+│       │       │   ├── msp
+│       │       │   │   ├── admincerts
+│       │       │   │   ├── cacerts
+│       │       │   │   │   └── ca.org2.example.com-cert.pem
+│       │       │   │   ├── config.yaml
+│       │       │   │   ├── keystore
+│       │       │   │   │   └── priv_sk
+│       │       │   │   ├── signcerts
+│       │       │   │   │   └── Admin@org2.example.com-cert.pem
+│       │       │   │   └── tlscacerts
+│       │       │   │       └── tlsca.org2.example.com-cert.pem
+│       │       │   └── tls
+│       │       │       ├── ca.crt
+│       │       │       ├── client.crt
+│       │       │       └── client.key
+│       │       └── User1@org2.example.com
+│       │           ├── msp
+│       │           │   ├── admincerts
+│       │           │   ├── cacerts
+│       │           │   │   └── ca.org2.example.com-cert.pem
+│       │           │   ├── config.yaml
+│       │           │   ├── keystore
+│       │           │   │   └── priv_sk
+│       │           │   ├── signcerts
+│       │           │   │   └── User1@org2.example.com-cert.pem
+│       │           │   └── tlscacerts
+│       │           │       └── tlsca.org2.example.com-cert.pem
+│       │           └── tls
+│       │               ├── ca.crt
+│       │               ├── client.crt
+│       │               └── client.key
+│       └── org3.example.com
+│           ├── ca
+│           │   ├── ca.org3.example.com-cert.pem
+│           │   └── priv_sk
+│           ├── msp
+│           │   ├── admincerts
+│           │   ├── cacerts
+│           │   │   └── ca.org3.example.com-cert.pem
+│           │   ├── config.yaml
+│           │   └── tlscacerts
+│           │       └── tlsca.org3.example.com-cert.pem
+│           ├── peers
+│           │   ├── peer0.org3.example.com
+│           │   │   ├── msp
+│           │   │   │   ├── admincerts
+│           │   │   │   ├── cacerts
+│           │   │   │   │   └── ca.org3.example.com-cert.pem
+│           │   │   │   ├── config.yaml
+│           │   │   │   ├── keystore
+│           │   │   │   │   └── priv_sk
+│           │   │   │   ├── signcerts
+│           │   │   │   │   └── peer0.org3.example.com-cert.pem
+│           │   │   │   └── tlscacerts
+│           │   │   │       └── tlsca.org3.example.com-cert.pem
+│           │   │   └── tls
+│           │   │       ├── ca.crt
+│           │   │       ├── server.crt
+│           │   │       └── server.key
+│           │   ├── peer1.org3.example.com
+│           │   │   ├── msp
+│           │   │   │   ├── admincerts
+│           │   │   │   ├── cacerts
+│           │   │   │   │   └── ca.org3.example.com-cert.pem
+│           │   │   │   ├── config.yaml
+│           │   │   │   ├── keystore
+│           │   │   │   │   └── priv_sk
+│           │   │   │   ├── signcerts
+│           │   │   │   │   └── peer1.org3.example.com-cert.pem
+│           │   │   │   └── tlscacerts
+│           │   │   │       └── tlsca.org3.example.com-cert.pem
+│           │   │   └── tls
+│           │   │       ├── ca.crt
+│           │   │       ├── server.crt
+│           │   │       └── server.key
+│           │   └── peer2.org3.example.com
+│           │       ├── msp
+│           │       │   ├── admincerts
+│           │       │   ├── cacerts
+│           │       │   │   └── ca.org3.example.com-cert.pem
+│           │       │   ├── config.yaml
+│           │       │   ├── keystore
+│           │       │   │   └── priv_sk
+│           │       │   ├── signcerts
+│           │       │   │   └── peer2.org3.example.com-cert.pem
+│           │       │   └── tlscacerts
+│           │       │       └── tlsca.org3.example.com-cert.pem
+│           │       └── tls
+│           │           ├── ca.crt
+│           │           ├── server.crt
+│           │           └── server.key
+│           ├── tlsca
+│           │   ├── priv_sk
+│           │   └── tlsca.org3.example.com-cert.pem
+│           └── users
+│               ├── Admin@org3.example.com
+│               │   ├── msp
+│               │   │   ├── admincerts
+│               │   │   ├── cacerts
+│               │   │   │   └── ca.org3.example.com-cert.pem
+│               │   │   ├── config.yaml
+│               │   │   ├── keystore
+│               │   │   │   └── priv_sk
+│               │   │   ├── signcerts
+│               │   │   │   └── Admin@org3.example.com-cert.pem
+│               │   │   └── tlscacerts
+│               │   │       └── tlsca.org3.example.com-cert.pem
+│               │   └── tls
+│               │       ├── ca.crt
+│               │       ├── client.crt
+│               │       └── client.key
+│               └── User1@org3.example.com
+│                   ├── msp
+│                   │   ├── admincerts
+│                   │   ├── cacerts
+│                   │   │   └── ca.org3.example.com-cert.pem
+│                   │   ├── config.yaml
+│                   │   ├── keystore
+│                   │   │   └── priv_sk
+│                   │   ├── signcerts
+│                   │   │   └── User1@org3.example.com-cert.pem
+│                   │   └── tlscacerts
+│                   │       └── tlsca.org3.example.com-cert.pem
+│                   └── tls
+│                       ├── ca.crt
+│                       ├── client.crt
+│                       └── client.key
+├── README.md
+├── scripts
+│   ├── createChannel.sh
+│   ├── deploy-chaincode3.sh
+│   ├── deploy-chaincode.sh
+│   ├── deployChaincode.sh
+│   ├── deploy-fix.sh
+│   ├── iot-auth.tar.gz
+│   ├── test-functions3.sh
+│   ├── test-functions.sh
+│   └── utils.sh
+└── start-network.sh
+
+354 directories, 350 files
