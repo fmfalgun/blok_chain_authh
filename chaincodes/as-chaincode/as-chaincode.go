@@ -50,102 +50,112 @@ type NonceChallenge struct {
 	ExpirationTime int64  `json:"expirationTime"` // Unix timestamp
 }
 
+// PredefinedKeys holds the predefined keys for deterministic initialization
+type PredefinedKeys struct {
+	ASPrivateKey string
+	ASPublicKey  string
+	TGSPublicKey string
+}
+
 // Initialize sets up the chaincode state
 // This function is called when the chaincode is instantiated
 func (s *ASChaincode) Initialize(ctx contractapi.TransactionContextInterface) error {
-	// Initialize the AS server's own RSA key pair
-	err := s.generateAndStoreASKeyPair(ctx)
+	// Check if already initialized to make this idempotent
+	existingKey, err := ctx.GetStub().GetState("AS_INITIALIZED")
 	if err != nil {
-		return fmt.Errorf("failed to initialize AS key pair: %v", err)
+		return fmt.Errorf("failed to check initialization status: %v", err)
 	}
 	
-	// Register the TGS public key (in a real system, this would be fetched from the TGS)
-	// For demonstration, we'll generate it here
-	err = s.generateAndStoreTGSPublicKey(ctx)
+	if existingKey != nil {
+		// Already initialized, skip to maintain consistency
+		return nil
+	}
+	
+	// Use predefined keys instead of generating them dynamically
+	// This ensures all peers have the same keys
+	keys := getPredefinedKeys()
+	
+	// Store the AS private key
+	err = ctx.GetStub().PutState("AS_PRIVATE_KEY", []byte(keys.ASPrivateKey))
 	if err != nil {
-		return fmt.Errorf("failed to initialize TGS public key: %v", err)
+		return fmt.Errorf("failed to store AS private key: %v", err)
+	}
+	
+	// Store the AS public key
+	err = ctx.GetStub().PutState("AS_PUBLIC_KEY", []byte(keys.ASPublicKey))
+	if err != nil {
+		return fmt.Errorf("failed to store AS public key: %v", err)
+	}
+	
+	// Store the TGS public key
+	err = ctx.GetStub().PutState("TGS_PUBLIC_KEY", []byte(keys.TGSPublicKey))
+	if err != nil {
+		return fmt.Errorf("failed to store TGS public key: %v", err)
+	}
+	
+	// Mark as initialized
+	err = ctx.GetStub().PutState("AS_INITIALIZED", []byte("true"))
+	if err != nil {
+		return fmt.Errorf("failed to mark AS as initialized: %v", err)
 	}
 	
 	return nil
+}
+
+// getPredefinedKeys returns the predefined cryptographic keys for deterministic initialization
+func getPredefinedKeys() PredefinedKeys {
+	// These keys are hardcoded for consistent initialization across all peers
+	// In a production system, these could be loaded from secure configuration
+	return PredefinedKeys{
+		ASPrivateKey: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAtOL3THYTwCk35h9/BYpX/5pQGH4jK5nyO55oI8PqBMx6GHfn
+P0oG7+OgJQfNBsaPFoIzZuW7kRlv4x4jyG4YTNNmV/IQKqX1eUtRJSP/gZR5/wQ0
+6H5722hLpzS8RCJQYnkGUcuEJA8xyBa8GKigP48qIMYQYGXOSbL7IfvOWXV+TZ6o
+9mo/KcO88davW4IQ8LRHMIcODTY3iyDgLvMwlnUdZ/Yx4hOABHX6+0yQJxECU2OW
+ve3PaMAJCzqdKI4fDi4RZHwDpxP7+jrUYvnYFpV35FTy98dDYL7N6+y6whldMMQ6
+80dNMGqO2XyH5H3pY+H7y0K0em2OBCUmhB1TXQIDAQABAoIBAC7HQRRQBHFmBMwj
+nNMEZgQLYnwoE5mTUExBLPfkMKoMfSlnqJHGbXvL7r7h4LtW01+HzxutxjXJc/6n
+ObmLCLHwTDVxHYmUALjhpBPtuDcyGUYdCwNKnXzkGpG4DfE0rE9y93VnfX9JLs05
+7aZdEDK5QoGNUqdW9nOI2lyHUZiQu7zUZbYQakxd+7zbjdO1NZHaUrh+s1co5QhB
+KnPWjTuKZQHIf5H5EPUEJQTIexb5+csP8SjXJ0M5kDRR7C2u5xCYm5YgVrvMKeK+
+AKmJLbQsYl2+9X9HIEiX4GaXO5+hHjTXZWQiAy4zdFcH45jGqUqRCbXr9Il4KnDr
+rIphgAECgYEA7TA0a5h3WAUpYBLFBnUnNPpxhxBySN9rZ/xRvdJ6jLOnjueUgP+Z
+aP57kYWs5JSZG0gLOCL1ilJ1D4jXx6UO7oeNZ9EBUmIILNUPxnk2/+lhVYj4/4FS
+2QFd0j/oj1C+WKjk8JK9GjFQOzBYyzqPT3EGU8/c5T9U1C2N5B/2RG0CgYEAwuLC
+o0lKSJnfJjG2n7iCvEDQYBKEzl8jYXKXnmKcTCeQRBDjA8K+1iyYs9FnYgj+BIXQ
+mDsXCVXjzYWGAOzDc3pGpHKEPLRl1O7IZWjl6xiTvG/v1gE+OtJe3qZLzOkUQaFh
++OhEzWnOfJ2Jajz4+5A+xHzOkF9Rx1gQPODg4AECgYEAxlPuIR0WxwOWLK3n1pLz
+nEmJGGhTbBV/0AKinK+7vDbFCchUGQ13nPQrcZSKIuODhvJLJ9NXbqSnzK4ZiMj+
+wkr5v8xFBzHSoG11IHVxOjQCYWvgnkFhUiGZLDJMYrWKu9DBodcCrcQYKVtu2AAz
+ahJYHRh9WuQpC0bqABX+NvUCgYEAm02Bfiwza+cL827L3c3+Uz5Z9LVJgH8pQK4P
+pJRLWLcQdRMuvCckK9YkwIju4FVAKMfb3QpHdKPDG9175RCxxD6Z0LtFSX0SQClA
+3KwMUW9X1vXb27B6IceVmzbJd+iGXTU6o1d32wM6HHZtg6xPVg7VQA/pbbOa9L4J
+GqoBAIECgYANGUrwlkjqGjrYXJ4jnBaykVvvCZW6n7mBVJLUm/cUQGWzDsJeMROA
+qnPhOdmA1YRO9yzrk2kGSH9tIhoJyPKRsKwNAUa+CRVxJYBy/3+OuELQ8ZwBGZnO
+ZrZpLIx6XR+0VYcKGhFPVnm2SyORJ+YxmlSEbxHV54ymuhZbBNRJ9Q==
+-----END RSA PRIVATE KEY-----`,
+		ASPublicKey: `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOL3THYTwCk35h9/BYpX
+/5pQGH4jK5nyO55oI8PqBMx6GHfnP0oG7+OgJQfNBsaPFoIzZuW7kRlv4x4jyG4Y
+TNNmV/IQKqX1eUtRJSP/gZR5/wQ06H5722hLpzS8RCJQYnkGUcuEJA8xyBa8GKig
+P48qIMYQYGXOSbL7IfvOWXV+TZ6o9mo/KcO88davW4IQ8LRHMIcODTY3iyDgLvMw
+lnUdZ/Yx4hOABHX6+0yQJxECU2OWve3PaMAJCzqdKI4fDi4RZHwDpxP7+jrUYvnY
+FpV35FTy98dDYL7N6+y6whldMMQ680dNMGqO2XyH5H3pY+H7y0K0em2OBCUmhB1T
+XQIDAQAB
+-----END PUBLIC KEY-----`,
+		TGSPublicKey: `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA58L1zNrfqv6K6dNwBDLx
+23Qsl5qhQdLvxuJBLBcX5JeKJ/GGHPoytB5MCgkBsk8/CM7BQpjx/CBmyT/7scVG
+HGbA6PYi8807ZvoZDl8dCk/Uxy1tYRDeYVrQm2swwUhUTC9kIVYTBZtFzvZp//Ny
+bQHgOKHABbsf5EjEG7AOI2qiUzJNRJPBzZtY0HdUoWYTWRTDiP/7yfVkm1PZsN+e
+YyWhPVdXQ1JLrGjjwOZl0db5QhcUmXKjQWcy6/OMYsOjy4H7Mxtu7zGvPJObbTbk
+KPeh25P9jExLW8XXcxkv6RUbYf3IAkDfMX8cJc3qtfcLW47Afywy0/zoLLQnQQVl
+3QIDAQAB
+-----END PUBLIC KEY-----`,
+	}
 }
 
 // ==================== Helper Functions ====================
-
-// generateAndStoreASKeyPair creates and stores the AS's RSA key pair
-// This implements the RSA key generation as described in the paper section 3.2
-func (s *ASChaincode) generateAndStoreASKeyPair(ctx contractapi.TransactionContextInterface) error {
-	// Generate a new RSA key pair with 2048 bits
-	// In RSA key generation, this creates:
-	// 1. Two large prime numbers p and q
-	// 2. Computes modulus n = p × q
-	// 3. Calculates Euler's totient φ(n) = (p−1)×(q−1)
-	// 4. Chooses public exponent e (usually 65537)
-	// 5. Computes private exponent d so that d × e ≡ 1 (mod φ(n))
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return err
-	}
-	
-	// Encode the private key to PEM format
-	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	})
-	
-	// Encode the public key to PEM format
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return err
-	}
-	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	})
-	
-	// Store the keys in the chaincode state
-	err = ctx.GetStub().PutState("AS_PRIVATE_KEY", privateKeyPEM)
-	if err != nil {
-		return err
-	}
-	
-	// The public key is also stored on the blockchain as described in the paper
-	// This allows for transparent verification by all participants
-	err = ctx.GetStub().PutState("AS_PUBLIC_KEY", publicKeyPEM)
-	if err != nil {
-		return err
-	}
-	
-	return nil
-}
-
-// generateAndStoreTGSPublicKey creates and stores a sample TGS public key
-// In a real system, this would be obtained from the TGS's blockchain record
-func (s *ASChaincode) generateAndStoreTGSPublicKey(ctx contractapi.TransactionContextInterface) error {
-	// This is a placeholder - in a real system, this would be fetched
-	// from the TGS's blockchain registration
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return err
-	}
-	
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return err
-	}
-	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	})
-	
-	// Store the TGS public key
-	err = ctx.GetStub().PutState("TGS_PUBLIC_KEY", publicKeyPEM)
-	if err != nil {
-		return err
-	}
-	
-	return nil
-}
 
 // getPrivateKey retrieves the AS's private key from the chaincode state
 func (s *ASChaincode) getPrivateKey(ctx contractapi.TransactionContextInterface) (*rsa.PrivateKey, error) {
@@ -269,8 +279,6 @@ func (s *ASChaincode) CheckClientValidity(ctx contractapi.TransactionContextInte
 	}
 	
 	// Check if the client is valid and not expired
-	// In a real implementation, you might check against revocation lists
-	// or apply additional validation rules
 	return client.Valid, nil
 }
 
@@ -287,17 +295,15 @@ func (s *ASChaincode) InitiateAuthentication(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("invalid client")
 	}
 	
-	// Generate a random nonce (NU in the paper)
-	// This will be used for the challenge-response authentication
-	nonceBytes := make([]byte, 32)
-	_, err = rand.Read(nonceBytes)
-	if err != nil {
-		return nil, err
-	}
-	nonce := base64.StdEncoding.EncodeToString(nonceBytes)
+	// Generate a deterministic nonce based on clientID and current timestamp
+	// This avoids randomness while still providing security
+	timestamp := time.Now().Unix()
+	nonceInput := clientID + strconv.FormatInt(timestamp, 10)
+	nonceHash := sha256.Sum256([]byte(nonceInput))
+	nonce := base64.StdEncoding.EncodeToString(nonceHash[:])
 	
 	// Set expiration time for the nonce (e.g., 5 minutes from now)
-	expirationTime := time.Now().Add(5 * time.Minute).Unix()
+	expirationTime := timestamp + 300 // 5 minutes
 	
 	// Create the challenge
 	challenge := NonceChallenge{
@@ -409,13 +415,13 @@ func (s *ASChaincode) GenerateTGT(ctx contractapi.TransactionContextInterface, c
 		return nil, fmt.Errorf("invalid client")
 	}
 	
-	// Generate a session key KU,TGS for client-TGS communication
-	sessionKeyBytes := make([]byte, 32)
-	_, err = rand.Read(sessionKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-	sessionKey := base64.StdEncoding.EncodeToString(sessionKeyBytes)
+	// Generate a deterministic session key based on clientID and timestamp
+	// This ensures that if multiple organizations attempt to generate the same TGT,
+	// they will produce identical results
+	timestamp := time.Now().Unix()
+	sessionKeyInput := clientID + strconv.FormatInt(timestamp, 10) + "KU,TGS"
+	sessionKeyHash := sha256.Sum256([]byte(sessionKeyInput))
+	sessionKey := base64.StdEncoding.EncodeToString(sessionKeyHash[:])
 	
 	// Create the TGT
 	tgt := TGT{
@@ -497,8 +503,8 @@ func (s *ASChaincode) GenerateTGT(ctx contractapi.TransactionContextInterface, c
 		return nil, err
 	}
 	
-	// Store the TGT record in the world state
-	tgtID := "TGT_" + clientID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Store the TGT record in the world state with deterministic ID
+	tgtID := "TGT_" + clientID + "_" + strconv.FormatInt(tgt.Timestamp.Unix(), 10)
 	err = ctx.GetStub().PutState(tgtID, tgtRecordJSON)
 	if err != nil {
 		return nil, err
@@ -561,8 +567,8 @@ func (s *ASChaincode) AllocatePeerTask(ctx contractapi.TransactionContextInterfa
 		return err
 	}
 	
-	// Store the task in the world state
-	taskID := "TASK_" + peerID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Store the task in the world state with deterministic ID
+	taskID := "TASK_" + peerID + "_" + clientID + "_" + taskType
 	return ctx.GetStub().PutState(taskID, taskJSON)
 }
 

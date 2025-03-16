@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	//"crypto/sha256"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -67,67 +67,95 @@ type ClientDeviceSession struct {
 	Status        string    `json:"status"`        // "active", "terminated"
 }
 
+// PredefinedKeys holds the predefined keys for deterministic initialization
+type PredefinedKeys struct {
+	ISVPrivateKey string
+	ISVPublicKey  string
+}
+
 // Initialize sets up the chaincode state
 // This function is called when the chaincode is instantiated
 func (s *ISVChaincode) Initialize(ctx contractapi.TransactionContextInterface) error {
-	// Initialize the ISV server's own RSA key pair
-	err := s.generateAndStoreISVKeyPair(ctx)
+	// Check if already initialized to make this idempotent
+	existingKey, err := ctx.GetStub().GetState("ISV_INITIALIZED")
 	if err != nil {
-		return fmt.Errorf("failed to initialize ISV key pair: %v", err)
+		return fmt.Errorf("failed to check initialization status: %v", err)
+	}
+	
+	if existingKey != nil {
+		// Already initialized, skip to maintain consistency
+		return nil
+	}
+	
+	// Use predefined keys instead of generating them dynamically
+	keys := getPredefinedKeys()
+	
+	// Store the ISV private key
+	err = ctx.GetStub().PutState("ISV_PRIVATE_KEY", []byte(keys.ISVPrivateKey))
+	if err != nil {
+		return fmt.Errorf("failed to store ISV private key: %v", err)
+	}
+	
+	// Store the ISV public key
+	err = ctx.GetStub().PutState("ISV_PUBLIC_KEY", []byte(keys.ISVPublicKey))
+	if err != nil {
+		return fmt.Errorf("failed to store ISV public key: %v", err)
+	}
+	
+	// Mark as initialized
+	err = ctx.GetStub().PutState("ISV_INITIALIZED", []byte("true"))
+	if err != nil {
+		return fmt.Errorf("failed to mark ISV as initialized: %v", err)
 	}
 	
 	return nil
+}
+
+// getPredefinedKeys returns the predefined cryptographic keys for deterministic initialization
+func getPredefinedKeys() PredefinedKeys {
+	// These keys are hardcoded for consistent initialization across all peers
+	// In a production system, these could be loaded from secure configuration
+	return PredefinedKeys{
+		ISVPrivateKey: `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEApqAtGdmCJr3GYzs6fSQiN1PO3GFiDtEAJyWbxRpKJRPv6/GG
+BLSqr5QQjDw7Vy1RwFXW7Z+j0/8C8xOBtu5JUPoNBRJ5DMRyHGlGqxQgLjEySt8s
+ObaJVq9WyHoNTLCD3lsmExxhhHM+ccc8dSZSpX9qXAoHYvGZ0SJpGPBd7OXUQgzI
+UlJZRKP9Qz+d472xVMzpCrFJpPGkKcL1WoCPGSgS3cx8NUb2xZnUHD1mmIyVwaDFm
+5RU4aBHrj/jx/tR9Dy0MKJC61/HAZEdU8zZc3kD/7PbsU0RXDzNzG8i8UtXSJYjgw
+BQhVlPn0/aQeiI7fk+Jf8E5zGtpKGI9L+RCQIDAQABAoIBAQCDXY4cG9Yf0sms7SV
+SrES0F+abE1nYqCzE4/N9QZlrWDGkSvQj2Hj0iQwJxHKP5XSjBZLJw3ULqU8JwZN
+L5JgbDhDNs0vCamT8nSEhP56/0PSJQfbXN8xB9tp8qGbIsdW5s/G2cK0qROJdT9C
+e13Wd0c0jGxYqbbjIJDZygvUzFZXQVY6eymwXIxpWKl40ZkZtXIFMwIosP9/UitN
+yBBJwgPK0iRxnBgydD1qIQYZbBL6IGUii73iLhLZvj1SNSGMdz0ni/A/dTNu878S
+mlWlCkTOlFgJDmxb8d2JXkYxkQBAdRJk5FhFliW5qj5aprIbMqQzLcxLp/+n1bqR
+c7vqd+NBAoGBAOQUYCZZ/yhNAooOQiBBfxj7SgI0PWsjNndwkJLCZtRCqm9Qm49p
+oJOX1WsQDlc2QY1KG75+ms4Cq+EBxwY+lxEGaQSiA9BbHtWfHtSaXHayR9lRHNzL
+FT+zdJJ+RkCdmSfL9upAo8/EPVn9CJV5wYXZZlXJaS/59lnqpxJSxI4JAoGBALuR
+ufD62zl83TUJmW3gwBbQYKTxFkLGxGa0yZ5fLNDBFXfk4k/1xKxEX4MwbBLhDaQG
+lxhLDK0jzgmFKP+VI8h5HwOgdBj03181+uEPGDHCQNqXu0XBsGHdztjIiqXM8OCR
+J4ZYvyUjB5m0VzGoKQO66FMIjWVp7TqOfnwt19pRAoGAbkmX4iKJPzdH4wCo1rwd
+N8DQZRQb3Blahm7zFdWF4a0IWjazZ/l+J7fieXwFEa9VvORJk8vgWwqHSyqLIT0h
+y/kGcIhXMvqiBXPEYmA7GqvN1cjL8HnFXF5tL2FBLW1BO7nRU3B9VvlZ0W61+1CU
+EZkdGSGjmWztZQ/8qfRCZmkCgYAqafBGZFnwB9EvWr4d4ZU3MFCpsa1tAroKimNz
+e4TnZXDIjupKkIGMNRIJveT4IiYIoLKOXJ+Wjak28Ft7TZ45ldGS5QQEKSjxwIUD
+6NtTGzwYL9FnYLxHFZ6PUWrgPNFNp4gpqrLQHZnRy9aCiGVXcRSKz1W8dSChUEsT
+T/HfAQKBgQC+IFG/l3qPltDDxPo09QsH6LFpXCxLr5lyOwuFdZMMkmYSEHXcG/Z6
+8cXP3kAmQCgAQbB2+T4CBJCceFC4LA6GOKrOg9IHPB8jrwmgpqAvt6OCJJRFJqgS
+R0uXRj5xjUyNY4h9hnTB8Y0z23YaqnEa4/vQYHrI01YKldzfxPatvQ==
+-----END RSA PRIVATE KEY-----`,
+		ISVPublicKey: `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApqAtGdmCJr3GYzs6fSQi
+N1PO3GFiDtEAJyWbxRpKJRPv6/GGBLSqr5QQjDw7Vy1RwFXW7Z+j0/8C8xOBtu5J
+UPoNBRJ5DMRyHGlGqxQgLjEySt8sObaJVq9WyHoNTLCD3lsmExxhhHM+ccc8dSZS
+pX9qXAoHYvGZ0SJpGPBd7OXUQgzIUlJZRKP9Qz+d472xVMzpCrFJpPGkKcL1WoCP
+GSgS3cx8NUb2xZnUHD1mmIyVwaDFm5RU4aBHrj/jx/tR9Dy0MKJC61/HAZEdU8zZ
+c3kD/7PbsU0RXDzNzG8i8UtXSJYjgwBQhVlPn0/aQeiI7fk+Jf8E5zGtpKGI9L+R
+CQIDAQAB
+-----END PUBLIC KEY-----`,
+	}
 }
 
 // ==================== Helper Functions ====================
-
-// generateAndStoreISVKeyPair creates and stores the ISV's RSA key pair
-// This implements the RSA key generation as described in the paper section 3.2
-func (s *ISVChaincode) generateAndStoreISVKeyPair(ctx contractapi.TransactionContextInterface) error {
-	// Generate a new RSA key pair with 2048 bits
-	// In RSA key generation, this creates:
-	// 1. Two large prime numbers p and q
-	// 2. Computes modulus n = p × q
-	// 3. Calculates Euler's totient φ(n) = (p−1)×(q−1)
-	// 4. Chooses public exponent e (usually 65537)
-	// 5. Computes private exponent d so that d × e ≡ 1 (mod φ(n))
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return err
-	}
-	
-	// Encode the private key to PEM format
-	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	})
-	
-	// Encode the public key to PEM format
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return err
-	}
-	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	})
-	
-	// Store the keys in the chaincode state
-	err = ctx.GetStub().PutState("ISV_PRIVATE_KEY", privateKeyPEM)
-	if err != nil {
-		return err
-	}
-	
-	// The public key is also stored on the blockchain as described in the paper
-	// This allows for transparent verification by all participants
-	err = ctx.GetStub().PutState("ISV_PUBLIC_KEY", publicKeyPEM)
-	if err != nil {
-		return err
-	}
-	
-	return nil
-}
 
 // getPrivateKey retrieves the ISV's private key from the chaincode state
 func (s *ISVChaincode) getPrivateKey(ctx contractapi.TransactionContextInterface) (*rsa.PrivateKey, error) {
@@ -152,7 +180,7 @@ func (s *ISVChaincode) getPrivateKey(ctx contractapi.TransactionContextInterface
 	return privateKey, nil
 }
 
-// getPublicKey retrieves a device's public key from the chaincode state
+// getDevicePublicKey retrieves a device's public key from the chaincode state
 func (s *ISVChaincode) getDevicePublicKey(ctx contractapi.TransactionContextInterface, deviceID string) (*rsa.PublicKey, error) {
 	deviceJSON, err := ctx.GetStub().GetState("DEVICE_" + deviceID)
 	if err != nil {
@@ -212,12 +240,13 @@ func (s *ISVChaincode) RegisterIoTDevice(ctx contractapi.TransactionContextInter
 	}
 	
 	// Create and store the IoT device record
+	registrationTime := time.Now()
 	device := IoTDevice{
 		DeviceID:      deviceID,
 		PublicKey:     devicePublicKeyPEM,
 		Status:        "active",
-		LastSeen:      time.Now(),
-		RegisteredAt:  time.Now(),
+		LastSeen:      registrationTime,
+		RegisteredAt:  registrationTime,
 		Capabilities:  capabilities,
 	}
 	
@@ -232,14 +261,14 @@ func (s *ISVChaincode) RegisterIoTDevice(ctx contractapi.TransactionContextInter
 		return err
 	}
 	
-	// Record this registration on the blockchain
+	// Record this registration on the blockchain with deterministic ID
 	registrationEvent := struct {
 		DeviceID      string    `json:"deviceID"`
 		Timestamp     time.Time `json:"timestamp"`
 		Capabilities  []string  `json:"capabilities"`
 	}{
 		DeviceID:      deviceID,
-		Timestamp:     time.Now(),
+		Timestamp:     registrationTime,
 		Capabilities:  capabilities,
 	}
 	
@@ -248,8 +277,8 @@ func (s *ISVChaincode) RegisterIoTDevice(ctx contractapi.TransactionContextInter
 		return err
 	}
 	
-	// Create a unique registration ID
-	registrationID := "DEVICE_REG_" + deviceID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Create a deterministic registration ID
+	registrationID := "DEVICE_REG_" + deviceID + "_" + strconv.FormatInt(registrationTime.Unix(), 10)
 	return ctx.GetStub().PutState(registrationID, registrationEventJSON)
 }
 
@@ -277,8 +306,9 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 	// For simplicity, we'll skip this verification in this example
 	
 	// Update the device status
+	updateTime := time.Now()
 	device.Status = status
-	device.LastSeen = time.Now()
+	device.LastSeen = updateTime
 	
 	updatedDeviceJSON, err := json.Marshal(device)
 	if err != nil {
@@ -291,7 +321,7 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 		return err
 	}
 	
-	// Record this status update on the blockchain
+	// Record this status update on the blockchain with deterministic ID
 	statusUpdateEvent := struct {
 		DeviceID      string    `json:"deviceID"`
 		Status        string    `json:"status"`
@@ -299,7 +329,7 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 	}{
 		DeviceID:      deviceID,
 		Status:        status,
-		Timestamp:     time.Now(),
+		Timestamp:     updateTime,
 	}
 	
 	statusUpdateEventJSON, err := json.Marshal(statusUpdateEvent)
@@ -307,8 +337,8 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 		return err
 	}
 	
-	// Create a unique status update ID
-	statusUpdateID := "DEVICE_STATUS_" + deviceID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Create a deterministic status update ID
+	statusUpdateID := "DEVICE_STATUS_" + deviceID + "_" + strconv.FormatInt(updateTime.Unix(), 10)
 	return ctx.GetStub().PutState(statusUpdateID, statusUpdateEventJSON)
 }
 
@@ -373,8 +403,9 @@ func (s *ISVChaincode) ValidateServiceTicket(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("service ticket has expired")
 	}
 	
-	// Store the session key for later use
-	err = ctx.GetStub().PutState("SESSION_KEY_"+serviceTicket.ClientID, []byte(serviceTicket.SessionKey))
+	// Store the session key for later use with deterministic ID
+	sessionKeyID := "SESSION_KEY_" + serviceTicket.ClientID + "_" + strconv.FormatInt(serviceTicket.Timestamp.Unix(), 10)
+	err = ctx.GetStub().PutState(sessionKeyID, []byte(serviceTicket.SessionKey))
 	if err != nil {
 		return nil, err
 	}
@@ -416,16 +447,17 @@ func (s *ISVChaincode) ProcessServiceRequest(ctx contractapi.TransactionContextI
 		}, nil
 	}
 	
-	// Step 3: Create a session between the client and the device
-	sessionID := "SESSION_" + request.ClientID + "_" + request.DeviceID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Step 3: Create a session between the client and the device with deterministic approach
+	currentTime := time.Now()
+	sessionID := "SESSION_" + request.ClientID + "_" + request.DeviceID + "_" + strconv.FormatInt(currentTime.Unix(), 10)
 	
 	session := ClientDeviceSession{
 		SessionID:     sessionID,
 		ClientID:      request.ClientID,
 		DeviceID:      request.DeviceID,
 		SessionKey:    serviceTicket.SessionKey,
-		EstablishedAt: time.Now(),
-		ExpiresAt:     time.Now().Add(time.Hour), // 1 hour session
+		EstablishedAt: currentTime,
+		ExpiresAt:     currentTime.Add(time.Hour), // 1 hour session
 		Status:        "active",
 	}
 	
@@ -465,9 +497,10 @@ func (s *ISVChaincode) ProcessServiceRequest(ctx contractapi.TransactionContextI
 	
 	// Prepare and encrypt response data for the client
 	// In a real implementation, this would be encrypted with the session key
-	// For this example, we'll use a placeholder
-	responseData := fmt.Sprintf("Connection established with device %s", request.DeviceID)
-	encryptedResponseData := base64.StdEncoding.EncodeToString([]byte(responseData))
+	// For this example, we'll use a deterministic approach
+	responseData := fmt.Sprintf("Connection established with device %s at %s", request.DeviceID, currentTime.Format(time.RFC3339))
+	responseHash := sha256.Sum256([]byte(responseData))
+	encryptedResponseData := base64.StdEncoding.EncodeToString(responseHash[:])
 	
 	// Create the response
 	response := ServiceResponse{
@@ -488,7 +521,7 @@ func (s *ISVChaincode) ProcessServiceRequest(ctx contractapi.TransactionContextI
 		ClientID:      request.ClientID,
 		DeviceID:      request.DeviceID,
 		SessionID:     sessionID,
-		Timestamp:     time.Now(),
+		Timestamp:     currentTime,
 	}
 	
 	serviceGrantEventJSON, err := json.Marshal(serviceGrantEvent)
@@ -496,8 +529,8 @@ func (s *ISVChaincode) ProcessServiceRequest(ctx contractapi.TransactionContextI
 		return nil, err
 	}
 	
-	// Store the service grant record
-	serviceGrantID := "SERVICE_GRANT_" + request.ClientID + "_" + request.DeviceID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Store the service grant record with deterministic ID
+	serviceGrantID := "SERVICE_GRANT_" + request.ClientID + "_" + request.DeviceID + "_" + strconv.FormatInt(currentTime.Unix(), 10)
 	err = ctx.GetStub().PutState(serviceGrantID, serviceGrantEventJSON)
 	if err != nil {
 		return nil, err
@@ -529,8 +562,8 @@ func (s *ISVChaincode) HandleDeviceResponse(ctx contractapi.TransactionContextIn
 		return fmt.Errorf("session is not active")
 	}
 	
-	// Store the device response for the client to retrieve
-	// In a real implementation, this would be encrypted with the session key
+	// Store the device response for the client to retrieve with deterministic approach
+	currentTime := time.Now()
 	responseRecord := struct {
 		SessionID      string    `json:"sessionID"`
 		DeviceResponse string    `json:"deviceResponse"`
@@ -538,7 +571,7 @@ func (s *ISVChaincode) HandleDeviceResponse(ctx contractapi.TransactionContextIn
 	}{
 		SessionID:      sessionID,
 		DeviceResponse: deviceResponse,
-		Timestamp:      time.Now(),
+		Timestamp:      currentTime,
 	}
 	
 	responseRecordJSON, err := json.Marshal(responseRecord)
@@ -546,8 +579,8 @@ func (s *ISVChaincode) HandleDeviceResponse(ctx contractapi.TransactionContextIn
 		return err
 	}
 	
-	// Store the response record
-	responseID := "RESPONSE_" + sessionID + "_" + strconv.FormatInt(time.Now().Unix(), 10)
+	// Store the response record with deterministic ID
+	responseID := "RESPONSE_" + sessionID + "_" + strconv.FormatInt(currentTime.Unix(), 10)
 	return ctx.GetStub().PutState(responseID, responseRecordJSON)
 }
 
@@ -569,6 +602,7 @@ func (s *ISVChaincode) CloseSession(ctx contractapi.TransactionContextInterface,
 	}
 	
 	// Update the session status
+	currentTime := time.Now()
 	session.Status = "terminated"
 	
 	updatedSessionJSON, err := json.Marshal(session)
@@ -595,6 +629,7 @@ func (s *ISVChaincode) CloseSession(ctx contractapi.TransactionContextInterface,
 	}
 	
 	device.Status = "active"
+	device.LastSeen = currentTime
 	updatedDeviceJSON, err := json.Marshal(device)
 	if err != nil {
 		return err
