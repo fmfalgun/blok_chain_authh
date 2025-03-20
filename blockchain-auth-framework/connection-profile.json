@@ -42,9 +42,9 @@
     },
     "peers": {
         "peer0.org1.example.com": {
-            "url": "grpcs://peer0.org1.example.com:7051",
+            "url": "grpcs://localhost:7051",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+                "path": "./certs/org1/ca.crt"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer0.org1.example.com",
@@ -52,9 +52,9 @@
             }
         },
         "peer0.org2.example.com": {
-            "url": "grpcs://peer0.org2.example.com:9051",
+            "url": "grpcs://localhost:9051",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
+                "path": "./certs/org2/ca.crt"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer0.org2.example.com",
@@ -62,9 +62,9 @@
             }
         },
         "peer0.org3.example.com": {
-            "url": "grpcs://peer0.org3.example.com:13051",
+            "url": "grpcs://localhost:13051",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt"
+                "path": "./certs/org3/ca.crt"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer0.org3.example.com",
@@ -77,27 +77,27 @@
             "url": "https://localhost:7054",
             "caName": "ca.org1.example.com",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem"
+                "path": "./certs/org1/ca.crt"
             },
             "httpOptions": {
                 "verify": false
             }
         },
         "ca.org2.example.com": {
-            "url": "https://ca.org2.example.com:8054",
+            "url": "https://localhost:8054",
             "caName": "ca.org2.example.com",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/ca/ca.org2.example.com-cert.pem"
+                "path": "./certs/org2/ca.crt"
             },
             "httpOptions": {
                 "verify": false
             }
         },
         "ca.org3.example.com": {
-            "url": "https://ca.org3.example.com:9054",
+            "url": "https://localhost:9054",
             "caName": "ca.org3.example.com",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/ca/ca.org3.example.com-cert.pem"
+                "path": "./certs/org3/ca.crt"
             },
             "httpOptions": {
                 "verify": false
@@ -133,9 +133,9 @@
     },
     "orderers": {
         "orderer.example.com": {
-            "url": "grpcs://orderer.example.com:7050",
+            "url": "grpcs://localhost:7050",
             "tlsCACerts": {
-                "path": "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem"
+                "path": "./certs/orderer/tlsca.example.com-cert.pem"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "orderer.example.com",
