@@ -1,0 +1,26 @@
+{
+  "name": "blockchain-auth-framework",
+  "version": "1.0.0",
+  "description": "Blockchain-based Authentication Framework for IoT Devices",
+  "main": "auth-framework.js",
+  "scripts": {
+    "enroll-admin": "node enrollAdmin.js",
+    "register-user": "node registerUser.js",
+    "start": "node auth-framework.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "blockchain",
+    "hyperledger",
+    "fabric",
+    "authentication",
+    "iot",
+    "kerberos"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fabric-ca-client": "^2.2.4",
+    "fabric-network": "^2.2.4"
+  }
+}

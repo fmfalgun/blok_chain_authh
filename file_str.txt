@@ -1,6 +1,19 @@
 .
 ├── chaincodes
+│   ├── as-chaincode
+│   │   ├── as-chaincode.go
+│   │   ├── go.mod
+│   │   └── go.sum
+│   ├── isv-chaincode
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   └── isv-chaincode.go
+│   └── tgs-chaincode
+│       ├── go.mod
+│       ├── go.sum
+│       └── tgs-chaincode.go
 ├── channel-artifacts
+│   ├── chaichis-channel.block
 │   ├── chaichis-channel.tx
 │   ├── channel.tx
 │   ├── genesis.block
@@ -692,15 +705,8 @@
 │                       └── client.key
 ├── README.md
 ├── scripts
-│   ├── createChannel.sh
-│   ├── deploy-chaincode3.sh
-│   ├── deploy-chaincode.sh
-│   ├── deployChaincode.sh
-│   ├── deploy-fix.sh
-│   ├── iot-auth.tar.gz
-│   ├── test-functions3.sh
-│   ├── test-functions.sh
+│   ├── test-ccs.sh
 │   └── utils.sh
 └── start-network.sh
 
-354 directories, 350 files
+357 directories, 353 files
