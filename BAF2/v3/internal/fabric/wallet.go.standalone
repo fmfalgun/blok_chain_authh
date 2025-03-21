@@ -1,0 +1,270 @@
+// Standalone wallet utility for the authentication framework
+// This file can be run directly for wallet management
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+)
+
+const (
+	walletPath = "wallet"
+)
+
+// promptAndImport prompts the user for certificate and key paths and imports them
+func promptAndImport(wallet *gateway.Wallet, username string) error {
+	fmt.Println("Please provide the certificate and key paths for the identity:")
+	
+	var certPath, keyPath, mspID string
+	
+	fmt.Println("Certificate path (PEM format):")
+	fmt.Scanln(&certPath)
+	
+	fmt.Println("Key path (PEM format):")
+	fmt.Scanln(&keyPath)
+	
+	fmt.Println("MSP ID (e.g., Org1MSP):")
+	fmt.Scanln(&mspID)
+	
+	if certPath == "" || keyPath == "" {
+		return fmt.Errorf("certificate and key paths are required")
+	}
+	
+	if mspID == "" {
+		mspID = "Org1MSP"
+		fmt.Printf("Using default MSP ID: %s\n", mspID)
+	}
+	
+	// Read certificate file
+	cert, err := os.ReadFile(certPath)
+	if err != nil {
+		return fmt.Errorf("failed to read certificate file: %v", err)
+	}
+	
+	// Read key file
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		return fmt.Errorf("failed to read key file: %v", err)
+	}
+	
+	// Create identity
+	identity := gateway.NewX509Identity(mspID, string(cert), string(key))
+	
+	// Add to wallet
+	err = wallet.Put(username, identity)
+	if err != nil {
+		return fmt.Errorf("failed to put identity into wallet: %v", err)
+	}
+	
+	fmt.Printf("Successfully imported identity '%s'\n", username)
+	return nil
+}
+
+// findAndImportFromCommonLocations attempts to find and import identity from common locations
+func findAndImportFromCommonLocations(wallet *gateway.Wallet, username string, mspID string) error {
+	fmt.Printf("Searching for certificates for %s...\n", username)
+	
+	// Common paths to check for credentials
+	mspPaths := []string{
+		"./certs/msp",
+		"./certs/org1/msp",
+		filepath.Join(os.Getenv("HOME"), ".fabric-ca-client"),
+	}
+
+	// Check common certificate locations
+	certificatePaths := []string{
+		fmt.Sprintf("./certs/org1/%s.crt", username),
+		fmt.Sprintf("./certs/%s.crt", username),
+		"./certs/org1/admin.crt",
+		"./certs/admin.crt",
+	}
+
+	// Check common key locations
+	keyPaths := []string{
+		fmt.Sprintf("./certs/org1/%s.key", username),
+		fmt.Sprintf("./certs/%s.key", username),
+		"./certs/org1/admin.key",
+		"./certs/admin.key",
+	}
+
+	// First try to find MSP structure
+	for _, mspPath := range mspPaths {
+		if !fileExists(mspPath) {
+			continue
+		}
+
+		fmt.Printf("Checking MSP directory: %s\n", mspPath)
+
+		// Look for signcerts
+		signcertsPath := filepath.Join(mspPath, "signcerts")
+		if !fileExists(signcertsPath) {
+			continue
+		}
+
+		// Look for keystore
+		keystorePath := filepath.Join(mspPath, "keystore")
+		if !fileExists(keystorePath) {
+			continue
+		}
+
+		// Find certificate files
+		certFiles, err := filepath.Glob(filepath.Join(signcertsPath, "*.pem"))
+		if err != nil || len(certFiles) == 0 {
+			// Try .crt extension
+			certFiles, err = filepath.Glob(filepath.Join(signcertsPath, "*.crt"))
+			if err != nil || len(certFiles) == 0 {
+				continue
+			}
+		}
+
+		// Find key files
+		keyFiles, err := filepath.Glob(filepath.Join(keystorePath, "*_sk"))
+		if err != nil || len(keyFiles) == 0 {
+			// Try .key extension
+			keyFiles, err = filepath.Glob(filepath.Join(keystorePath, "*.key"))
+			if err != nil || len(keyFiles) == 0 {
+				continue
+			}
+		}
+
+		if len(certFiles) > 0 && len(keyFiles) > 0 {
+			fmt.Printf("Found certificate: %s\n", certFiles[0])
+			fmt.Printf("Found key: %s\n", keyFiles[0])
+			
+			// Read certificate
+			cert, err := os.ReadFile(certFiles[0])
+			if err != nil {
+				fmt.Printf("Error reading certificate: %v\n", err)
+				continue
+			}
+			
+			// Read key
+			key, err := os.ReadFile(keyFiles[0])
+			if err != nil {
+				fmt.Printf("Error reading key: %v\n", err)
+				continue
+			}
+			
+			// Create identity
+			identity := gateway.NewX509Identity(mspID, string(cert), string(key))
+			
+			// Add to wallet
+			err = wallet.Put(username, identity)
+			if err != nil {
+				fmt.Printf("Error adding identity to wallet: %v\n", err)
+				continue
+			}
+			
+			fmt.Printf("Successfully imported identity '%s' from MSP directory\n", username)
+			return nil
+		}
+	}
+
+	// Try individual certificate and key files
+	for i, certPath := range certificatePaths {
+		if !fileExists(certPath) {
+			continue
+		}
+
+		// Find a matching key
+		keyPath := ""
+		if i < len(keyPaths) {
+			keyPath = keyPaths[i]
+			if !fileExists(keyPath) {
+				continue
+			}
+		} else {
+			for _, kp := range keyPaths {
+				if fileExists(kp) {
+					keyPath = kp
+					break
+				}
+			}
+		}
+
+		if keyPath == "" {
+			continue
+		}
+
+		fmt.Printf("Found certificate: %s\n", certPath)
+		fmt.Printf("Found key: %s\n", keyPath)
+		
+		// Read certificate
+		cert, err := os.ReadFile(certPath)
+		if err != nil {
+			fmt.Printf("Error reading certificate: %v\n", err)
+			continue
+		}
+		
+		// Read key
+		key, err := os.ReadFile(keyPath)
+		if err != nil {
+			fmt.Printf("Error reading key: %v\n", err)
+			continue
+		}
+		
+		// Create identity
+		identity := gateway.NewX509Identity(mspID, string(cert), string(key))
+		
+		// Add to wallet
+		err = wallet.Put(username, identity)
+		if err != nil {
+			fmt.Printf("Error adding identity to wallet: %v\n", err)
+			continue
+		}
+		
+		fmt.Printf("Successfully imported identity '%s'\n", username)
+		return nil
+	}
+
+	return fmt.Errorf("could not find valid certificate and key files")
+}
+
+// fileExists checks if a file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+func main() {
+	fmt.Println("Fabric Wallet Utility")
+	fmt.Println("====================")
+	
+	// Create wallet directory if it doesn't exist
+	if _, err := os.Stat(walletPath); os.IsNotExist(err) {
+		os.MkdirAll(walletPath, 0755)
+		fmt.Printf("Created wallet directory: %s\n", walletPath)
+	}
+	
+	// Create wallet
+	wallet, err := gateway.NewFileSystemWallet(walletPath)
+	if err != nil {
+		fmt.Printf("Failed to create wallet: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Check if admin identity already exists
+	if wallet.Exists("admin") {
+		fmt.Println("Admin identity already exists in wallet")
+		os.Exit(0)
+	}
+	
+	// Try to find and import admin identity from common locations
+	err = findAndImportFromCommonLocations(wallet, "admin", "Org1MSP")
+	if err != nil {
+		fmt.Printf("Automatic import failed: %v\n", err)
+		fmt.Println("Attempting manual import...")
+		
+		// Prompt for certificate and key paths
+		err = promptAndImport(wallet, "admin")
+		if err != nil {
+			fmt.Printf("Manual import failed: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	
+	fmt.Println("Wallet initialization completed successfully!")
+}
