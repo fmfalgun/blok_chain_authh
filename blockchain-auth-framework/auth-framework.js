@@ -40,22 +40,27 @@ async function generateKeyPair() {
     });
 }
 
-// Utility to properly encrypt data using public key
-function encryptWithPublicKey(publicKey, data) {
+// Update the encryptWithPublicKey function to match Go's RSA encryption
+function encryptWithPublicKey(publicKeyPEM, data) {
     try {
-        // Use proper RSA encryption
-        const buffer = Buffer.from(data);
+        // Parse the PEM format public key
+        const publicKey = crypto.createPublicKey(publicKeyPEM);
+        
+        // Convert data to Buffer
+        const dataBuffer = Buffer.from(data);
+        
+        // Use PKCS#1 v1.5 padding which is commonly used in Go's RSA encryption
         const encrypted = crypto.publicEncrypt(
             {
                 key: publicKey,
                 padding: crypto.constants.RSA_PKCS1_PADDING
             },
-            buffer
+            dataBuffer
         );
+        
         return encrypted.toString('base64');
     } catch (error) {
         console.error(`Encryption error: ${error.message}`);
-        // Fall back to simple encoding for testing
         return Buffer.from(data).toString('base64');
     }
 }
@@ -75,7 +80,6 @@ function decryptWithPrivateKey(privateKey, data) {
         return decrypted.toString();
     } catch (error) {
         console.error(`Decryption error: ${error.message}`);
-        // Fall back to simple decoding for testing
         return Buffer.from(data, 'base64').toString();
     }
 }
@@ -195,171 +199,7 @@ async function registerIoTDevice(username, deviceId, capabilities) {
     }
 }
 
-// Fetch AS public key from the blockchain
-async function getASPublicKey(asContract) {
-    try {
-        // This function assumes you've added a function in the AS chaincode to get the public key
-        // You may need to implement this in the chaincode or use a hardcoded public key for testing
-        console.log("Fetching AS public key...");
-        // For testing purposes, if the chaincode doesn't have this function, use a hardcoded key
-        const asPublicKey = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOL3THYTwCk35h9/BYpX
-/5pQGH4jK5nyO55oI8PqBMx6GHfnP0oG7+OgJQfNBsaPFoIzZuW7kRlv4x4jyG4Y
-TNNmV/IQKqX1eUtRJSP/gZR5/wQ06H5722hLpzS8RCJQYnkGUcuEJA8xyBa8GKig
-P48qIMYQYGXOSbL7IfvOWXV+TZ6o9mo/KcO88davW4IQ8LRHMIcODTY3iyDgLvMw
-lnUdZ/Yx4hOABHX6+0yQJxECU2OWve3PaMAJCzqdKI4fDi4RZHwDpxP7+jrUYvnY
-FpV35FTy98dDYL7N6+y6whldMMQ680dNMGqO2XyH5H3pY+H7y0K0em2OBCUmhB1T
-XQIDAQAB
------END PUBLIC KEY-----`;
-        return asPublicKey;
-    } catch (error) {
-        console.error(`Failed to get AS public key: ${error}`);
-        throw error;
-    }
-}
-
 // 3.1 Get TGT from Authentication Server
-// async function getTGT(username, clientId) {
-//     let gateway, network;
-//     try {
-//         const connection = await connectToNetwork(username);
-//         if (!connection) return null;
-//         
-//         gateway = connection.gateway;
-//         network = connection.network;
-// 
-//         // Get contract for AS chaincode
-//         const asContract = network.getContract(asChaincodeId);
-// 
-//         // Step 1: Initiate authentication - use submitTransaction to ensure it's committed
-//         console.log('Initiating authentication for client ID:', clientId);
-//         const nonceResponse = await asContract.submitTransaction('InitiateAuthentication', clientId);
-//         const nonceChallenge = JSON.parse(nonceResponse.toString());
-//         console.log('Received nonce challenge:', nonceChallenge);
-// 
-//         // Add delay to ensure blockchain state propagates
-//         console.log("Waiting for blockchain state propagation...");
-//         await new Promise(resolve => setTimeout(resolve, 2000));
-// 
-//         // Get the AS public key (ideally from the blockchain)
-//         const asPublicKey = await getASPublicKey(asContract);
-// 
-//         // Step 2: Load the client's private key
-//         console.log(`Loading private key for client ${clientId}...`);
-//         const clientPrivateKey = fs.readFileSync(`${clientId}-private.pem`, 'utf8');
-// 
-//         // Step 3: Create a proper cryptographic response to the challenge
-//         // In Kerberos, the client would decrypt the nonce with its private key
-//         // and re-encrypt it with the AS's public key
-//         // For our simplified implementation, we'll simulate this process
-//         
-//         // First "decrypt" the nonce (in our case, it's already in plaintext)
-//         const nonce = nonceChallenge.nonce;
-//         
-//         // Then encrypt the nonce with AS's public key
-//         console.log("Encrypting nonce with AS public key...");
-//         const encryptedNonce = encryptWithPublicKey(asPublicKey, nonce);
-//         console.log('Encrypted nonce:', encryptedNonce);
-// 
-//         // Step 4: Verify client identity with the encrypted nonce
-//         console.log(`Verifying client identity for ${clientId}...`);
-//         try {
-//             const verificationResult = await asContract.submitTransaction('VerifyClientIdentity', clientId, encryptedNonce);
-//             console.log('Client identity verified successfully:', verificationResult.toString());
-//         } catch (verifyError) {
-//             console.error(`Verification failed: ${verifyError.message}`);
-//             
-//             // For debugging: Try with simple base64 encoding instead of RSA encryption
-//             console.log("Trying alternative encryption method...");
-//             const simpleEncryptedNonce = Buffer.from(nonce).toString('base64');
-//             try {
-//                 const altVerification = await asContract.submitTransaction('VerifyClientIdentity', clientId, simpleEncryptedNonce);
-//                 console.log('Alternative verification succeeded:', altVerification.toString());
-//             } catch (altError) {
-//                 console.error(`Alternative verification also failed: ${altError.message}`);
-//                 throw verifyError; // Throw the original error
-//             }
-//         }
-// 
-//         // Step 5: Get TGT
-//         console.log("Requesting TGT...");
-//         const tgtResponse = await asContract.submitTransaction('GenerateTGT', clientId);
-//         const tgt = JSON.parse(tgtResponse.toString());
-//         console.log('Received TGT successfully');
-// 
-//         // Save TGT for later use
-//         fs.writeFileSync(`${clientId}-tgt.json`, JSON.stringify(tgt));
-// 
-//         gateway.disconnect();
-//         return tgt;
-//     } catch (error) {
-//         console.error(`Failed to get TGT: ${error}`);
-//         if (gateway) gateway.disconnect();
-//         return null;
-//     }
-// }
-
-// Add this to the auth-framework.js file
-// async function getTGT(username, clientId) {
-//     let gateway, network;
-//     try {
-//         const connection = await connectToNetwork(username);
-//         if (!connection) return null;
-//         
-//         gateway = connection.gateway;
-//         network = connection.network;
-// 
-//         // Get contract for AS chaincode
-//         const asContract = network.getContract(asChaincodeId);
-// 
-//         // Step 1: Get the nonce challenge
-//         console.log('Getting nonce challenge for client ID:', clientId);
-//         const nonceResponse = await asContract.submitTransaction('InitiateAuthentication', clientId);
-//         const nonceChallenge = JSON.parse(nonceResponse.toString());
-//         console.log('Received nonce challenge:', nonceChallenge);
-// 
-//         // Wait for state to propagate
-//         console.log("Waiting for blockchain state propagation...");
-//         await new Promise(resolve => setTimeout(resolve, 3000));
-// 
-//         // Step 2: Skip the encryption/verification step (the problematic part)
-//         // Instead, directly get the TGT
-//         console.log("Requesting TGT directly...");
-//         try {
-//             const tgtResponse = await asContract.submitTransaction('GenerateTGT', clientId);
-//             const tgt = JSON.parse(tgtResponse.toString());
-//             console.log('Received TGT successfully');
-// 
-//             // Save TGT for later use
-//             fs.writeFileSync(`${clientId}-tgt.json`, JSON.stringify(tgt));
-//             
-//             gateway.disconnect();
-//             return tgt;
-//         } catch (tgtError) {
-//             console.error(`Failed to get TGT: ${tgtError.message}`);
-//             
-//             // Try an alternative approach - query all clients to see if this client exists
-//             console.log("Checking client registration...");
-//             const clientsResponse = await asContract.evaluateTransaction('GetAllClientRegistrations');
-//             const clients = JSON.parse(clientsResponse.toString());
-//             const client = clients.find(c => c.id === clientId);
-//             
-//             if (client) {
-//                 console.log(`Client ${clientId} exists in the system:`, client);
-//             } else {
-//                 console.log(`Client ${clientId} not found in the system.`);
-//             }
-//             
-//             throw tgtError;
-//         }
-//         
-//     } catch (error) {
-//         console.error(`Failed to complete authentication process: ${error}`);
-//         if (gateway) gateway.disconnect();
-//         return null;
-//     }
-// }
-
 async function getTGT(username, clientId) {
     let gateway, network;
     try {
@@ -372,49 +212,55 @@ async function getTGT(username, clientId) {
         // Get contract for AS chaincode
         const asContract = network.getContract(asChaincodeId);
 
-        // Step 1: Get the nonce challenge - use evaluateTransaction to avoid consensus issues
+        // Step 1: Get the nonce challenge
         console.log('Getting nonce challenge for client ID:', clientId);
-        const nonceResponse = await asContract.evaluateTransaction('InitiateAuthentication', clientId);
+        const nonceResponse = await asContract.submitTransaction('InitiateAuthentication', clientId);
         const nonceChallenge = JSON.parse(nonceResponse.toString());
         console.log('Received nonce challenge:', nonceChallenge);
         
-        // Step 2: Now use submitTransaction to actually create the challenge in the world state
-        console.log('Storing authentication challenge...');
-        await asContract.submitTransaction('InitiateAuthentication', clientId);
-        console.log('Challenge stored successfully');
-        
-        // Wait for state to propagate
         console.log("Waiting for blockchain state propagation...");
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
-        // Step 3: Simple verification approach - just base64 encode the nonce
-        const simpleEncryptedNonce = Buffer.from(nonceChallenge.nonce).toString('base64');
-        console.log('Using simplified encryption:', simpleEncryptedNonce);
+        // The AS public key (must match exactly what's in the chaincode)
+        const asPublicKey = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOL3THYTwCk35h9/BYpX
+/5pQGH4jK5nyO55oI8PqBMx6GHfnP0oG7+OgJQfNBsaPFoIzZuW7kRlv4x4jyG4Y
+TNNmV/IQKqX1eUtRJSP/gZR5/wQ06H5722hLpzS8RCJQYnkGUcuEJA8xyBa8GKig
+P48qIMYQYGXOSbL7IfvOWXV+TZ6o9mo/KcO88davW4IQ8LRHMIcODTY3iyDgLvMw
+lnUdZ/Yx4hOABHX6+0yQJxECU2OWve3PaMAJCzqdKI4fDi4RZHwDpxP7+jrUYvnY
+FpV35FTy98dDYL7N6+y6whldMMQ680dNMGqO2XyH5H3pY+H7y0K0em2OBCUmhB1T
+XQIDAQAB
+-----END PUBLIC KEY-----`;
+
+        // We need to craft the EXACT format of encryption that the AS chaincode expects
+        // Step 2: Encrypt the nonce with AS's public key
+        console.log('Encrypting the nonce with AS public key...');
         
-        // Try verification
-        try {
-            console.log('Attempting verification...');
-            // Try evaluate first to see if it would work without affecting state
-            await asContract.evaluateTransaction('VerifyClientIdentity', clientId, simpleEncryptedNonce);
-            
-            // If evaluate succeeds, try submit to actually update state
-            console.log('Verification looks good, submitting...');
-            await asContract.submitTransaction('VerifyClientIdentity', clientId, simpleEncryptedNonce);
-            console.log('Verification successful');
-        } catch (verifyError) {
-            console.error(`Verification failed: ${verifyError.message}`);
-            // Continue anyway to test if we can get a TGT
-        }
+        // Convert the nonce to a buffer and encrypt it
+        const nonceBuffer = Buffer.from(nonceChallenge.nonce);
+        
+        // This is the key part: use the exact encryption format expected by Go's RSA implementation
+        const cryptoKey = crypto.createPublicKey(asPublicKey);
+        const encryptedNonce = crypto.publicEncrypt(
+            {
+                key: cryptoKey,
+                padding: crypto.constants.RSA_PKCS1_PADDING
+            },
+            nonceBuffer
+        );
+        
+        // Convert to base64 for transmission
+        const encryptedNonceBase64 = encryptedNonce.toString('base64');
+        console.log('Encrypted nonce (base64):', encryptedNonceBase64);
 
-        // Step 4: Try to get the TGT
-        console.log("Requesting TGT...");
+        // Step 3: Verify client identity
         try {
-            // Try evaluate first to see if it would work
-            console.log("Testing TGT request...");
-            await asContract.evaluateTransaction('GenerateTGT', clientId);
+            console.log('Verifying client identity...');
+            const verificationResult = await asContract.submitTransaction('VerifyClientIdentity', clientId, encryptedNonceBase64);
+            console.log('Verification successful:', verificationResult.toString());
             
-            // If evaluate succeeds, try submit to actually get the TGT
-            console.log("TGT request looks good, submitting...");
+            // Step 4: Now that we're verified, get the TGT
+            console.log("Requesting TGT...");
             const tgtResponse = await asContract.submitTransaction('GenerateTGT', clientId);
             const tgt = JSON.parse(tgtResponse.toString());
             console.log('Received TGT successfully');
@@ -424,11 +270,11 @@ async function getTGT(username, clientId) {
             
             gateway.disconnect();
             return tgt;
-        } catch (tgtError) {
-            console.error(`Failed to get TGT: ${tgtError.message}`);
-            throw tgtError;
+        } catch (verifyError) {
+            console.error(`Verification failed: ${verifyError.message}`);
+            gateway.disconnect();
+            return null;
         }
-        
     } catch (error) {
         console.error(`Failed to complete authentication process: ${error}`);
         if (gateway) gateway.disconnect();
