@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
+//	"path/filepath"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 )

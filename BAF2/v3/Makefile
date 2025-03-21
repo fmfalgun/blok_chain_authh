@@ -78,3 +78,11 @@ help:
 	@echo "  help             - Display this help information"
 
 .DEFAULT_GOAL := help
+
+setup-full:
+	@echo "Setting up complete environment..."
+	@mkdir -p $(CONFIG_DIR) keys wallet sessions
+	@./scripts/setup.sh
+	@./scripts/copy-certs.sh
+	@./scripts/init-wallet.sh
+	@$(MAKE) build
