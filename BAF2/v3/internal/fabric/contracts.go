@@ -9,9 +9,9 @@ import (
 
 const (
 	// Contract IDs
-	ASContractID  = "as-chaincode"
-	TGSContractID = "tgs-chaincode"
-	ISVContractID = "isv-chaincode"
+	ASContractID  = "as-chaincode_1.1"
+	TGSContractID = "tgs-chaincode_2.0"
+	ISVContractID = "isv-chaincode_2.0"
 )
 
 // ContractManager manages interactions with the Fabric contracts

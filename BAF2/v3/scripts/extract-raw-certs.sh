@@ -1,3 +1,37 @@
+#!/bin/bash
+# Script to extract raw certificates and create a proper connection profile
+
+set -e  # Exit on any error
+
+echo "Extracting raw certificates..."
+
+# Create directories to store certificates
+mkdir -p crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls
+mkdir -p crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls
+mkdir -p crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls
+mkdir -p crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls
+mkdir -p crypto-config/peerOrganizations/org1.example.com/ca
+mkdir -p crypto-config/peerOrganizations/org2.example.com/ca
+mkdir -p crypto-config/peerOrganizations/org3.example.com/ca
+
+# Extract raw certificates
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt" > crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" > crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem" > crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
+
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" > crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/ca/ca.org2.example.com-cert.pem" > crypto-config/peerOrganizations/org2.example.com/ca/ca.org2.example.com-cert.pem
+
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt" > crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
+
+docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/ca/ca.org3.example.com-cert.pem" > crypto-config/peerOrganizations/org3.example.com/ca/ca.org3.example.com-cert.pem
+
+echo "Creating connection profile with certificate paths..."
+
+cat > config/connection-profile.json << EOF
 {
     "name": "chaichis-network",
     "version": "1.0.0",
@@ -211,3 +245,6 @@
         }
     }
 }
+EOF
+
+echo "Connection profile created with raw certificate paths"

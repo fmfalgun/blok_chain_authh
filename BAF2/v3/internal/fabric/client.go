@@ -1,6 +1,10 @@
 package fabric
 
 import (
+	"crypto/tls"
+	"google.golang.org/grpc"
+    	"google.golang.org/grpc/credentials"
+
 	"os"
 	"path/filepath"
 
@@ -30,6 +34,49 @@ type ClientOptions struct {
 	ConfigPath  string
 	ChannelName string
 	WalletPath  string
+}
+
+// createTLSConfig creates a TLS configuration with verification disabled
+func createInsecureTLSConfig() *tls.Config {
+    return &tls.Config{
+        InsecureSkipVerify: true,
+    }
+}
+
+// Connect connects to the Fabric network using the specified identity
+func (c *Client) Connect(identity string) error {
+    // Ensure identity exists in wallet
+    if !c.wallet.Exists(identity) {
+        return errors.Errorf("identity '%s' not found in wallet", identity)
+    }
+    
+    // Ensure connection profile exists
+    if _, err := os.Stat(c.configPath); os.IsNotExist(err) {
+        return errors.Errorf("connection profile not found at '%s'", c.configPath)
+    }
+    
+    // Load connection profile
+    ccpPath, err := filepath.Abs(c.configPath)
+    if err != nil {
+        return errors.Wrap(err, "failed to get absolute path for connection profile")
+    }
+    
+    // Connect to gateway with TLS verification disabled for development only
+    gw, err := gateway.Connect(
+        gateway.WithConfig(config.FromFile(ccpPath)),
+        gateway.WithIdentity(c.wallet.wallet, identity),
+        gateway.WithClientConnectionOptions(
+            grpc.WithTransportCredentials(
+                credentials.NewTLS(createInsecureTLSConfig()),
+            ),
+        ),
+    )
+    if err != nil {
+        return errors.Wrap(err, "failed to connect to gateway")
+    }
+    
+    c.gateway = gw
+    return nil
 }
 
 // NewClient creates a new Fabric client

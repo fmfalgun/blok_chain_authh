@@ -1,3 +1,30 @@
+#!/bin/bash
+# Script to update connection profile with embedded certificates
+
+set -e  # Exit on any error
+
+echo "Creating connection profile with embedded certificates..."
+
+# Create a temp directory
+mkdir -p /tmp/fabric-certs
+
+# Extract certificates directly and format them in one step
+ORDERER_CA=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt" | sed 's/$/\\n/' | tr -d '\n')
+
+ORG1_CA=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" | sed 's/$/\\n/' | tr -d '\n')
+
+ORG1_CA_PEM=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem" | sed 's/$/\\n/' | tr -d '\n')
+
+ORG2_CA=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" | sed 's/$/\\n/' | tr -d '\n')
+
+ORG2_CA_PEM=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/ca/ca.org2.example.com-cert.pem" | sed 's/$/\\n/' | tr -d '\n')
+
+ORG3_CA=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt" | sed 's/$/\\n/' | tr -d '\n')
+
+ORG3_CA_PEM=$(docker exec cli bash -c "cat /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/ca/ca.org3.example.com-cert.pem" | sed 's/$/\\n/' | tr -d '\n')
+
+# Create the connection profile with actual certificate content
+cat > config/connection-profile.json << EOF
 {
     "name": "chaichis-network",
     "version": "1.0.0",
@@ -78,7 +105,7 @@
         "orderer.example.com": {
             "url": "grpcs://orderer.example.com:7050",
             "tlsCACerts": {
-                "path": "crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt"
+                "pem": "${ORDERER_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "orderer.example.com",
@@ -90,7 +117,7 @@
         "peer0.org1.example.com": {
             "url": "grpcs://peer0.org1.example.com:7051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+                "pem": "${ORG1_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer0.org1.example.com",
@@ -100,7 +127,7 @@
         "peer1.org1.example.com": {
             "url": "grpcs://peer1.org1.example.com:8051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+                "pem": "${ORG1_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer1.org1.example.com",
@@ -110,7 +137,7 @@
         "peer2.org1.example.com": {
             "url": "grpcs://peer2.org1.example.com:11051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+                "pem": "${ORG1_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer2.org1.example.com",
@@ -120,7 +147,7 @@
         "peer0.org2.example.com": {
             "url": "grpcs://peer0.org2.example.com:9051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
+                "pem": "${ORG2_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer0.org2.example.com",
@@ -130,7 +157,7 @@
         "peer1.org2.example.com": {
             "url": "grpcs://peer1.org2.example.com:10051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
+                "pem": "${ORG2_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer1.org2.example.com",
@@ -140,7 +167,7 @@
         "peer2.org2.example.com": {
             "url": "grpcs://peer2.org2.example.com:12051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
+                "pem": "${ORG2_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer2.org2.example.com",
@@ -150,7 +177,7 @@
         "peer0.org3.example.com": {
             "url": "grpcs://peer0.org3.example.com:13051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt"
+                "pem": "${ORG3_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer0.org3.example.com",
@@ -160,7 +187,7 @@
         "peer1.org3.example.com": {
             "url": "grpcs://peer1.org3.example.com:14051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt"
+                "pem": "${ORG3_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer1.org3.example.com",
@@ -170,7 +197,7 @@
         "peer2.org3.example.com": {
             "url": "grpcs://peer2.org3.example.com:15051",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt"
+                "pem": "${ORG3_CA}"
             },
             "grpcOptions": {
                 "ssl-target-name-override": "peer2.org3.example.com",
@@ -183,7 +210,7 @@
             "url": "https://ca.org1.example.com:7054",
             "caName": "ca.org1.example.com",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem"
+                "pem": ["${ORG1_CA_PEM}"]
             },
             "httpOptions": {
                 "verify": false
@@ -193,7 +220,7 @@
             "url": "https://ca.org2.example.com:8054",
             "caName": "ca.org2.example.com",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org2.example.com/ca/ca.org2.example.com-cert.pem"
+                "pem": ["${ORG2_CA_PEM}"]
             },
             "httpOptions": {
                 "verify": false
@@ -203,7 +230,7 @@
             "url": "https://ca.org3.example.com:9054",
             "caName": "ca.org3.example.com",
             "tlsCACerts": {
-                "path": "crypto-config/peerOrganizations/org3.example.com/ca/ca.org3.example.com-cert.pem"
+                "pem": ["${ORG3_CA_PEM}"]
             },
             "httpOptions": {
                 "verify": false
@@ -211,3 +238,6 @@
         }
     }
 }
+EOF
+
+echo "Connection profile with embedded certificates created successfully!"
