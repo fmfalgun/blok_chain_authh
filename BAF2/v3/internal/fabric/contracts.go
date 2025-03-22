@@ -9,7 +9,7 @@ import (
 
 const (
 	// Contract IDs
-	ASContractID  = "as-chaincode_1.1"
+	ASContractID  = "as_chaincode_1.1"
 	TGSContractID = "tgs-chaincode_2.0"
 	ISVContractID = "isv-chaincode_2.0"
 )
