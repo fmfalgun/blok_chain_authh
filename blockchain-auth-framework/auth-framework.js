@@ -17,6 +17,17 @@ const isvChaincodeId = 'isv-chaincode';
 const ccpPath = path.resolve(__dirname, 'connection-profile.json');
 const walletPath = path.resolve(__dirname, 'wallet');
 
+// The AS public key (must match exactly what's in the chaincode)
+const asPublicKey = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOL3THYTwCk35h9/BYpX
+/5pQGH4jK5nyO55oI8PqBMx6GHfnP0oG7+OgJQfNBsaPFoIzZuW7kRlv4x4jyG4Y
+TNNmV/IQKqX1eUtRJSP/gZR5/wQ06H5722hLpzS8RCJQYnkGUcuEJA8xyBa8GKig
+P48qIMYQYGXOSbL7IfvOWXV+TZ6o9mo/KcO88davW4IQ8LRHMIcODTY3iyDgLvMw
+lnUdZ/Yx4hOABHX6+0yQJxECU2OWve3PaMAJCzqdKI4fDi4RZHwDpxP7+jrUYvnY
+FpV35FTy98dDYL7N6+y6whldMMQ680dNMGqO2XyH5H3pY+H7y0K0em2OBCUmhB1T
+XQIDAQAB
+-----END PUBLIC KEY-----`;
+
 // Utility to generate RSA key pair
 async function generateKeyPair() {
     return new Promise((resolve, reject) => {
@@ -27,7 +38,7 @@ async function generateKeyPair() {
                 format: 'pem'
             },
             privateKeyEncoding: {
-                type: 'pkcs8',
+                type: 'pkcs1',
                 format: 'pem'
             }
         }, (err, publicKey, privateKey) => {
@@ -40,16 +51,20 @@ async function generateKeyPair() {
     });
 }
 
-// Update the encryptWithPublicKey function to match Go's RSA encryption
+// Fixed encryptWithPublicKey function to ensure compatibility with Go's RSA implementation
 function encryptWithPublicKey(publicKeyPEM, data) {
     try {
         // Parse the PEM format public key
-        const publicKey = crypto.createPublicKey(publicKeyPEM);
+        const publicKey = crypto.createPublicKey({
+            key: publicKeyPEM,
+            format: 'pem',
+            type: 'spki'
+        });
         
-        // Convert data to Buffer
+        // Convert data to Buffer to ensure consistent byte representation
         const dataBuffer = Buffer.from(data);
         
-        // Use PKCS#1 v1.5 padding which is commonly used in Go's RSA encryption
+        // Use PKCS#1 v1.5 padding which is compatible with Go's RSA encryption
         const encrypted = crypto.publicEncrypt(
             {
                 key: publicKey,
@@ -61,15 +76,24 @@ function encryptWithPublicKey(publicKeyPEM, data) {
         return encrypted.toString('base64');
     } catch (error) {
         console.error(`Encryption error: ${error.message}`);
-        return Buffer.from(data).toString('base64');
+        throw error;
     }
 }
 
 // Utility to decrypt data using private key
-function decryptWithPrivateKey(privateKey, data) {
+function decryptWithPrivateKey(privateKeyPEM, data) {
     try {
-        // Use proper RSA decryption
+        // Create private key object
+        const privateKey = crypto.createPrivateKey({
+            key: privateKeyPEM,
+            format: 'pem',
+            type: 'pkcs8'
+        });
+        
+        // Decode base64 data to buffer
         const buffer = Buffer.from(data, 'base64');
+        
+        // Use proper RSA decryption with PKCS#1 v1.5 padding
         const decrypted = crypto.privateDecrypt(
             {
                 key: privateKey,
@@ -77,10 +101,11 @@ function decryptWithPrivateKey(privateKey, data) {
             },
             buffer
         );
+        
         return decrypted.toString();
     } catch (error) {
         console.error(`Decryption error: ${error.message}`);
-        return Buffer.from(data, 'base64').toString();
+        throw error;
     }
 }
 
@@ -199,7 +224,42 @@ async function registerIoTDevice(username, deviceId, capabilities) {
     }
 }
 
-// 3.1 Get TGT from Authentication Server
+// Add this function to auth-framework.js to sign the nonce instead of encrypting it
+function signNonce(privateKeyPEM, nonceBase64) {
+  try {
+    // Check if the private key is in PKCS#8 format and convert to PKCS#1 if needed
+    let privateKeyForSigning = privateKeyPEM;
+    if (privateKeyPEM.includes('PRIVATE KEY') && !privateKeyPEM.includes('RSA PRIVATE KEY')) {
+      console.log('Converting PKCS#8 key to PKCS#1 format...');
+      // Convert from PKCS#8 to PKCS#1
+      const privateKeyObj = crypto.createPrivateKey(privateKeyPEM);
+      privateKeyForSigning = privateKeyObj.export({
+        type: 'pkcs1',
+        format: 'pem'
+      });
+      console.log('Key format converted successfully');
+    }
+    
+    // Decode the nonce from base64
+    const nonceBuffer = Buffer.from(nonceBase64, 'base64');
+    
+    // Create a hash of the nonce
+    const hash = crypto.createHash('sha256').update(nonceBuffer).digest();
+    
+    // Sign with the private key (no explicit type needed if already converted)
+    const signature = crypto.sign('sha256', hash, {
+      key: privateKeyForSigning,
+      padding: crypto.constants.RSA_PKCS1_PADDING
+    });
+    
+    return signature.toString('base64');
+  } catch (error) {
+    console.error(`Signing error: ${error.message}`);
+    throw error;
+  }
+}
+
+// Replace the getTGT function with this updated version
 async function getTGT(username, clientId) {
     let gateway, network;
     try {
@@ -221,42 +281,29 @@ async function getTGT(username, clientId) {
         console.log("Waiting for blockchain state propagation...");
         await new Promise(resolve => setTimeout(resolve, 5000));
 
-        // The AS public key (must match exactly what's in the chaincode)
-        const asPublicKey = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOL3THYTwCk35h9/BYpX
-/5pQGH4jK5nyO55oI8PqBMx6GHfnP0oG7+OgJQfNBsaPFoIzZuW7kRlv4x4jyG4Y
-TNNmV/IQKqX1eUtRJSP/gZR5/wQ06H5722hLpzS8RCJQYnkGUcuEJA8xyBa8GKig
-P48qIMYQYGXOSbL7IfvOWXV+TZ6o9mo/KcO88davW4IQ8LRHMIcODTY3iyDgLvMw
-lnUdZ/Yx4hOABHX6+0yQJxECU2OWve3PaMAJCzqdKI4fDi4RZHwDpxP7+jrUYvnY
-FpV35FTy98dDYL7N6+y6whldMMQ680dNMGqO2XyH5H3pY+H7y0K0em2OBCUmhB1T
-XQIDAQAB
------END PUBLIC KEY-----`;
+        // Load client's private key
+        console.log('Loading client private key...');
+        const privateKeyPEM = fs.readFileSync(`${clientId}-private.pem`, 'utf8');
+       
+	// Add this before signing
+	console.log('Verifying key compatibility...');
+	const privateKey = crypto.createPrivateKey(privateKeyPEM);
+	const publicKey = crypto.createPublicKey(privateKey);
+	const publicKeyPEM = publicKey.export({
+	  type: 'spki',
+	  format: 'pem'
+	});
+	console.log('Derived public key from private key:', publicKeyPEM);
 
-        // We need to craft the EXACT format of encryption that the AS chaincode expects
-        // Step 2: Encrypt the nonce with AS's public key
-        console.log('Encrypting the nonce with AS public key...');
-        
-        // Convert the nonce to a buffer and encrypt it
-        const nonceBuffer = Buffer.from(nonceChallenge.nonce);
-        
-        // This is the key part: use the exact encryption format expected by Go's RSA implementation
-        const cryptoKey = crypto.createPublicKey(asPublicKey);
-        const encryptedNonce = crypto.publicEncrypt(
-            {
-                key: cryptoKey,
-                padding: crypto.constants.RSA_PKCS1_PADDING
-            },
-            nonceBuffer
-        );
-        
-        // Convert to base64 for transmission
-        const encryptedNonceBase64 = encryptedNonce.toString('base64');
-        console.log('Encrypted nonce (base64):', encryptedNonceBase64);
+        // Step 2: Sign the nonce with the client's private key
+        console.log('Signing the nonce with client private key...');
+        const signedNonce = signNonce(privateKeyPEM, nonceChallenge.nonce);
+        console.log('Signed nonce (base64):', signedNonce);
 
-        // Step 3: Verify client identity
+        // Step 3: Verify client identity using signature-based verification
         try {
-            console.log('Verifying client identity...');
-            const verificationResult = await asContract.submitTransaction('VerifyClientIdentity', clientId, encryptedNonceBase64);
+            console.log('Verifying client identity with signature...');
+            const verificationResult = await asContract.submitTransaction('VerifyClientIdentityWithSignature', clientId, signedNonce);
             console.log('Verification successful:', verificationResult.toString());
             
             // Step 4: Now that we're verified, get the TGT
@@ -271,9 +318,32 @@ XQIDAQAB
             gateway.disconnect();
             return tgt;
         } catch (verifyError) {
-            console.error(`Verification failed: ${verifyError.message}`);
-            gateway.disconnect();
-            return null;
+            console.error(`Signature verification failed: ${verifyError.message}`);
+            
+            // Fall back to the original encryption method for backward compatibility
+            console.log('\nFalling back to encryption-based verification...');
+            try {
+                // This is the original encryption-based approach
+                const encryptedNonce = encryptWithPublicKey(asPublicKey, Buffer.from(nonceChallenge.nonce, 'base64'));
+                console.log('Encrypted nonce (base64):', encryptedNonce);
+                
+                const verificationResult = await asContract.submitTransaction('VerifyClientIdentity', clientId, encryptedNonce);
+                console.log('Verification successful using encryption method:', verificationResult.toString());
+                
+                console.log("Requesting TGT...");
+                const tgtResponse = await asContract.submitTransaction('GenerateTGT', clientId);
+                const tgt = JSON.parse(tgtResponse.toString());
+                console.log('Received TGT successfully');
+
+                fs.writeFileSync(`${clientId}-tgt.json`, JSON.stringify(tgt));
+                
+                gateway.disconnect();
+                return tgt;
+            } catch (encryptError) {
+                console.error(`Encryption-based verification also failed: ${encryptError.message}`);
+                gateway.disconnect();
+                return null;
+            }
         }
     } catch (error) {
         console.error(`Failed to complete authentication process: ${error}`);
@@ -293,13 +363,28 @@ async function getServiceTicket(username, clientId, serviceId) {
 
         // Load saved TGT
         const tgtData = JSON.parse(fs.readFileSync(`${clientId}-tgt.json`, 'utf8'));
+        
+        // Load client's private key
+        const clientPrivateKey = fs.readFileSync(`${clientId}-private.pem`, 'utf8');
 
         // Prepare service ticket request
+        // Create an authenticator - in Kerberos, this would typically contain client ID and timestamp
+        const currentTime = new Date();
+        const authenticator = {
+            clientID: clientId,
+            timestamp: currentTime.toISOString()
+        };
+        
+        // Convert authenticator to string and encrypt with session key
+        // In a real implementation, you would decrypt the session key from tgtData.encryptedSessionKey first
+        const authenticatorStr = JSON.stringify(authenticator);
+        const encryptedAuthenticator = Buffer.from(authenticatorStr).toString('base64');
+
         const serviceTicketRequest = {
             encryptedTGT: tgtData.encryptedTGT,
             clientID: clientId,
             serviceID: serviceId,
-            authenticator: Buffer.from(Date.now().toString()).toString('base64') // Simulated authenticator
+            authenticator: encryptedAuthenticator
         };
 
         // Submit request to TGS
@@ -445,6 +530,66 @@ async function closeSession(username, clientId, deviceId) {
     }
 }
 
+// Added debugging utility for RSA operations
+async function debugRSAEncryption(nonce) {
+    console.log('======= RSA ENCRYPTION DEBUG =======');
+    
+    try {
+        console.log('Input nonce:', nonce);
+        
+        // 1. Check if already base64 encoded
+        let nonceBuffer;
+        try {
+            nonceBuffer = Buffer.from(nonce, 'base64');
+            const decodedNonce = nonceBuffer.toString();
+            console.log('Nonce appears to be base64 encoded. Decoded:', decodedNonce);
+        } catch (e) {
+            console.log('Nonce is not base64 encoded, treating as plain text');
+            nonceBuffer = Buffer.from(nonce);
+        }
+        
+        console.log('Nonce as buffer:', nonceBuffer);
+        console.log('Nonce buffer length:', nonceBuffer.length);
+        
+        // 2. Try different encryption approaches
+        console.log('\nTrying different encryption approaches:');
+        
+        // Approach 1: Standard Node.js encryption
+        const cryptoKey1 = crypto.createPublicKey({
+            key: asPublicKey,
+            format: 'pem',
+            type: 'spki'
+        });
+        
+        const encrypted1 = crypto.publicEncrypt(
+            {
+                key: cryptoKey1,
+                padding: crypto.constants.RSA_PKCS1_PADDING
+            },
+            nonceBuffer
+        );
+        
+        console.log('Approach 1 - Result (base64):', encrypted1.toString('base64'));
+        console.log('Approach 1 - Length:', encrypted1.length);
+        
+        // Approach 2: Try with different padding
+        const encrypted2 = crypto.publicEncrypt(
+            {
+                key: cryptoKey1,
+                padding: crypto.constants.RSA_NO_PADDING
+            },
+            Buffer.concat([Buffer.alloc(256 - nonceBuffer.length - 1), nonceBuffer])
+        );
+        
+        console.log('Approach 2 - Result (base64):', encrypted2.toString('base64'));
+        console.log('Approach 2 - Length:', encrypted2.length);
+        
+        console.log('======= DEBUG COMPLETE =======');
+    } catch (error) {
+        console.error('Error during debugging:', error);
+    }
+}
+
 // Main function for demo
 async function main() {
     const command = process.argv[2];
@@ -513,6 +658,15 @@ async function main() {
             await closeSession(username, closeClientId, closeDeviceId);
             break;
             
+        case 'debug-rsa':
+            const nonce = process.argv[4];
+            if (!nonce) {
+                console.error('Usage: node auth-framework.js debug-rsa <nonce>');
+                return;
+            }
+            await debugRSAEncryption(nonce);
+            break;
+            
         default:
             console.log('Available commands:');
             console.log('  register-client <username> <clientId>');
@@ -520,6 +674,7 @@ async function main() {
             console.log('  authenticate <username> <clientId> <deviceId>');
             console.log('  get-device-data <username> <clientId> <deviceId>');
             console.log('  close-session <username> <clientId> <deviceId>');
+            console.log('  debug-rsa <nonce>');
     }
 }
 
@@ -529,3 +684,15 @@ main().then(() => {
 }).catch(error => {
     console.error('Error in main:', error);
 });
+
+// Export functions for external use
+module.exports = {
+    registerClient,
+    registerIoTDevice,
+    getTGT,
+    getServiceTicket,
+    accessIoTDevice,
+    getIoTDeviceData,
+    closeSession,
+    debugRSAEncryption
+};

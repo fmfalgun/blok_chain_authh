@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -9,7 +10,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	//"math/big"
 	"strconv"
 	"time"
 
@@ -27,7 +27,15 @@ type ClientIdentity struct {
 	PublicKey       string    `json:"publicKey"`
 	RegistrationTime time.Time `json:"registrationTime"`
 	Valid           bool      `json:"valid"`
-	Nonce           string    `json:"nonce,omitempty"`  // Used during authentication process
+	// Nonce field removed - now stored separately
+}
+
+// AuthChallenge represents an authentication challenge for a client
+type AuthChallenge struct {
+	ClientID       string    `json:"clientID"`
+	Nonce          string    `json:"nonce"`
+	ExpirationTime int64     `json:"expirationTime"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 // TGT represents a Ticket Granting Ticket
@@ -55,6 +63,18 @@ type PredefinedKeys struct {
 	ASPrivateKey string
 	ASPublicKey  string
 	TGSPublicKey string
+}
+
+// getDeterministicTimestamp gets a deterministic timestamp from the transaction context
+func getDeterministicTimestamp(ctx contractapi.TransactionContextInterface) (time.Time, error) {
+    // Get timestamp from transaction context - this will be identical across all peers
+    txTimestamp, err := ctx.GetStub().GetTxTimestamp()
+    if err != nil {
+        return time.Time{}, fmt.Errorf("failed to get transaction timestamp: %v", err)
+    }
+    
+    // Convert to Go time.Time
+    return time.Unix(txTimestamp.Seconds, int64(txTimestamp.Nanos)), nil
 }
 
 // Initialize sets up the chaincode state
@@ -208,6 +228,34 @@ func (s *ASChaincode) getPublicKey(ctx contractapi.TransactionContextInterface, 
 	return publicKey, nil
 }
 
+// getClientPublicKey retrieves a client's public key from the chaincode state
+func (s *ASChaincode) getClientPublicKey(ctx contractapi.TransactionContextInterface, clientID string) (*rsa.PublicKey, error) {
+	clientPublicKeyPEM, err := ctx.GetStub().GetState("CLIENT_PK_" + clientID)
+	if err != nil {
+		return nil, err
+	}
+	if clientPublicKeyPEM == nil {
+		return nil, fmt.Errorf("client public key not found")
+	}
+	
+	block, _ := pem.Decode(clientPublicKeyPEM)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block containing client public key")
+	}
+	
+	publicKeyInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	
+	publicKey, ok := publicKeyInterface.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("not an RSA public key")
+	}
+	
+	return publicKey, nil
+}
+
 // ==================== Core AS Operations ====================
 
 // RegisterClient registers a new client with the AS
@@ -233,12 +281,18 @@ func (s *ASChaincode) RegisterClient(ctx contractapi.TransactionContextInterface
 		return fmt.Errorf("invalid public key: %v", err)
 	}
 	
+	// Get transaction timestamp from the blockchain
+	txTimestamp, err := getDeterministicTimestamp(ctx)
+	if err != nil {
+    	return fmt.Errorf("failed to get transaction timestamp: %v", err)
+	}
+	
 	// Create and store the client record
 	client := ClientIdentity{
-		ID:              clientID,
-		PublicKey:       clientPublicKeyPEM,
-		RegistrationTime: time.Now(),
-		Valid:           true,
+	    ID:              clientID,
+	    PublicKey:       clientPublicKeyPEM,
+	    RegistrationTime: txTimestamp,
+	    Valid:           true,
 	}
 	
 	clientJSON, err := json.Marshal(client)
@@ -295,112 +349,209 @@ func (s *ASChaincode) InitiateAuthentication(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("invalid client")
 	}
 	
-	// Generate a deterministic nonce based on clientID and current timestamp
-	// This avoids randomness while still providing security
-	timestamp := time.Now().Unix()
-	nonceInput := clientID + strconv.FormatInt(timestamp, 10)
-	nonceHash := sha256.Sum256([]byte(nonceInput))
-	nonce := base64.StdEncoding.EncodeToString(nonceHash[:])
-	
-	// Set expiration time for the nonce (e.g., 5 minutes from now)
-	expirationTime := timestamp + 300 // 5 minutes
-	
-	// Create the challenge
-	challenge := NonceChallenge{
-		Nonce:          nonce,
-		ExpirationTime: expirationTime,
-	}
-	
-	// Store the nonce with the client record for later verification
-	clientJSON, err := ctx.GetStub().GetState("CLIENT_" + clientID)
-	if err != nil {
-		return nil, err
-	}
-	
-	var client ClientIdentity
-	err = json.Unmarshal(clientJSON, &client)
-	if err != nil {
-		return nil, err
-	}
-	
-	client.Nonce = nonce
-	updatedClientJSON, err := json.Marshal(client)
-	if err != nil {
-		return nil, err
-	}
-	
-	err = ctx.GetStub().PutState("CLIENT_"+clientID, updatedClientJSON)
-	if err != nil {
-		return nil, err
-	}
-	
-	return &challenge, nil
+	// Get deterministic timestamp
+    timestamp, err := getDeterministicTimestamp(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get timestamp: %v", err)
+    }
+    
+    // Generate a deterministic nonce based on clientID and current timestamp
+    nonceInput := clientID + strconv.FormatInt(timestamp.Unix(), 10)
+    nonceHash := sha256.Sum256([]byte(nonceInput))
+    nonce := base64.StdEncoding.EncodeToString(nonceHash[:])
+    
+    // Set expiration time for the nonce (e.g., 5 minutes from now)
+    expirationTime := timestamp.Unix() + 300 // 5 minutes
+    
+    // Create the challenge response for the client
+    challenge := NonceChallenge{
+        Nonce:          nonce,
+        ExpirationTime: expirationTime,
+    }
+    
+    // Create and store the auth challenge in the world state
+    authChallenge := AuthChallenge{
+        ClientID:       clientID,
+        Nonce:          nonce,
+        ExpirationTime: expirationTime,
+        CreatedAt:      timestamp,
+    }
+    
+    // Convert to JSON
+    authChallengeJSON, err := json.Marshal(authChallenge)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Store in world state with a deterministic key
+    // This allows all peers to access the same challenge
+    authChallengeKey := fmt.Sprintf("AUTH_CHALLENGE_%s", clientID)
+    err = ctx.GetStub().PutState(authChallengeKey, authChallengeJSON)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &challenge, nil
 }
 
-// VerifyClientIdentity verifies a client's response to the nonce challenge
+// VerifyClientIdentity verifies a client's response to the nonce challenge using RSA encryption
 // This implements the client authentication verification from the paper
 // Step 3: AS decrypts the nonce using its private key to verify client identity
 func (s *ASChaincode) VerifyClientIdentity(ctx contractapi.TransactionContextInterface, clientID string, encryptedNonce string) (bool, error) {
-	// Retrieve the client record to get the expected nonce
-	clientJSON, err := ctx.GetStub().GetState("CLIENT_" + clientID)
-	if err != nil {
-		return false, err
-	}
-	if clientJSON == nil {
-		return false, fmt.Errorf("client %s does not exist", clientID)
-	}
-	
-	var client ClientIdentity
-	err = json.Unmarshal(clientJSON, &client)
-	if err != nil {
-		return false, err
-	}
-	
-	if client.Nonce == "" {
-		return false, fmt.Errorf("no authentication challenge found for client")
-	}
-	
-	// Get the AS private key to decrypt the client's response
-	privateKey, err := s.getPrivateKey(ctx)
-	if err != nil {
-		return false, err
-	}
-	
-	// Decode the base64 encoded encrypted nonce
-	encryptedNonceBytes, err := base64.StdEncoding.DecodeString(encryptedNonce)
-	if err != nil {
-		return false, err
-	}
-	
-	// Decrypt the nonce using AS's private key
-	// This implements: NU = CU^dAS = (NU^eAS)^dAS mod nAS from the paper
-	decryptedNonce, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, encryptedNonceBytes)
-	if err != nil {
-		return false, fmt.Errorf("decryption failed: %v", err)
-	}
-	
-	// Convert decrypted nonce to base64 for comparison
-	decryptedNonceB64 := base64.StdEncoding.EncodeToString(decryptedNonce)
-	
-	// Compare the decrypted nonce with the expected nonce
-	// This verifies that the client correctly encrypted the nonce with AS's public key
-	if decryptedNonceB64 != client.Nonce {
-		return false, nil
-	}
-	
-	// Clear the nonce from the client record as it's been used
-	client.Nonce = ""
-	updatedClientJSON, err := json.Marshal(client)
-	if err != nil {
-		return false, err
-	}
-	
-	err = ctx.GetStub().PutState("CLIENT_"+clientID, updatedClientJSON)
-	if err != nil {
-		return false, err
-	}
-	
-	return true, nil
+	// Retrieve the client record to confirm existence
+    clientJSON, err := ctx.GetStub().GetState("CLIENT_" + clientID)
+    if err != nil {
+        return false, err
+    }
+    if clientJSON == nil {
+        return false, fmt.Errorf("client %s does not exist", clientID)
+    }
+    
+    // Retrieve the auth challenge from world state
+    authChallengeKey := fmt.Sprintf("AUTH_CHALLENGE_%s", clientID)
+    authChallengeJSON, err := ctx.GetStub().GetState(authChallengeKey)
+    if err != nil {
+        return false, err
+    }
+    if authChallengeJSON == nil {
+        return false, fmt.Errorf("no authentication challenge found for client")
+    }
+    
+    // Parse the auth challenge
+    var authChallenge AuthChallenge
+    err = json.Unmarshal(authChallengeJSON, &authChallenge)
+    if err != nil {
+        return false, err
+    }
+    
+    // Check if the challenge has expired
+    timestamp, err := getDeterministicTimestamp(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to get timestamp: %v", err)
+    }
+    
+    if timestamp.Unix() > authChallenge.ExpirationTime {
+        // Delete the expired challenge
+        err = ctx.GetStub().DelState(authChallengeKey)
+        if err != nil {
+            return false, err
+        }
+        return false, fmt.Errorf("authentication challenge has expired")
+    }
+    
+    // Get the AS private key to decrypt the client's response
+    privateKey, err := s.getPrivateKey(ctx)
+    if err != nil {
+        return false, err
+    }
+    
+    // Decode the base64 encoded encrypted nonce
+    encryptedNonceBytes, err := base64.StdEncoding.DecodeString(encryptedNonce)
+    if err != nil {
+        return false, err
+    }
+    
+    // Decrypt the nonce using AS's private key
+    decryptedNonce, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, encryptedNonceBytes)
+    if err != nil {
+        return false, fmt.Errorf("decryption failed: %v", err)
+    }
+    
+    // Convert decrypted nonce to base64 for comparison
+    decryptedNonceB64 := base64.StdEncoding.EncodeToString(decryptedNonce)
+    
+    // Compare the decrypted nonce with the expected nonce
+    if decryptedNonceB64 != authChallenge.Nonce {
+        return false, nil
+    }
+    
+    // Delete the used challenge from the world state
+    err = ctx.GetStub().DelState(authChallengeKey)
+    if err != nil {
+        return false, err
+    }
+    
+    return true, nil
+}
+
+// VerifyClientIdentityWithSignature verifies a client's identity using signature-based verification
+// This is a more compatible alternative to VerifyClientIdentity for cross-platform use
+func (s *ASChaincode) VerifyClientIdentityWithSignature(ctx contractapi.TransactionContextInterface, clientID string, signedNonceBase64 string) (bool, error) {
+    // Retrieve the client record to confirm existence
+    clientJSON, err := ctx.GetStub().GetState("CLIENT_" + clientID)
+    if err != nil {
+        return false, err
+    }
+    if clientJSON == nil {
+        return false, fmt.Errorf("client %s does not exist", clientID)
+    }
+    
+    // Retrieve the auth challenge from world state
+    authChallengeKey := fmt.Sprintf("AUTH_CHALLENGE_%s", clientID)
+    authChallengeJSON, err := ctx.GetStub().GetState(authChallengeKey)
+    if err != nil {
+        return false, err
+    }
+    if authChallengeJSON == nil {
+        return false, fmt.Errorf("no authentication challenge found for client")
+    }
+    
+    // Parse the auth challenge
+    var authChallenge AuthChallenge
+    err = json.Unmarshal(authChallengeJSON, &authChallenge)
+    if err != nil {
+        return false, err
+    }
+    
+    // Check if the challenge has expired
+    timestamp, err := getDeterministicTimestamp(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to get timestamp: %v", err)
+    }
+    
+    if timestamp.Unix() > authChallenge.ExpirationTime {
+        // Delete the expired challenge
+        err = ctx.GetStub().DelState(authChallengeKey)
+        if err != nil {
+            return false, err
+        }
+        return false, fmt.Errorf("authentication challenge has expired")
+    }
+    
+    // Get client's public key
+    clientPublicKey, err := s.getClientPublicKey(ctx, clientID)
+    if err != nil {
+        return false, err
+    }
+    
+    // Decode the base64 encoded signature
+    signatureBytes, err := base64.StdEncoding.DecodeString(signedNonceBase64)
+    if err != nil {
+        return false, fmt.Errorf("invalid signature format: %v", err)
+    }
+    
+    // Decode the nonce from base64
+    nonceBytes, err := base64.StdEncoding.DecodeString(authChallenge.Nonce)
+    if err != nil {
+        return false, fmt.Errorf("invalid nonce format: %v", err)
+    }
+    
+    // Create a hash of the nonce to verify against the signature
+    hashed := sha256.Sum256(nonceBytes)
+    
+    // Verify the signature
+    err = rsa.VerifyPKCS1v15(clientPublicKey, crypto.SHA256, hashed[:], signatureBytes)
+    if err != nil {
+        return false, fmt.Errorf("signature verification failed: %v", err)
+    }
+    
+    // Signature is valid, delete the used challenge
+    err = ctx.GetStub().DelState(authChallengeKey)
+    if err != nil {
+        return false, err
+    }
+    
+    return true, nil
 }
 
 // GenerateTGT generates a Ticket Granting Ticket (TGT) for a client
@@ -415,11 +566,16 @@ func (s *ASChaincode) GenerateTGT(ctx contractapi.TransactionContextInterface, c
 		return nil, fmt.Errorf("invalid client")
 	}
 	
+	// Get deterministic timestamp
+	timestamp, err := getDeterministicTimestamp(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get timestamp: %v", err)
+	}
+	
 	// Generate a deterministic session key based on clientID and timestamp
 	// This ensures that if multiple organizations attempt to generate the same TGT,
 	// they will produce identical results
-	timestamp := time.Now().Unix()
-	sessionKeyInput := clientID + strconv.FormatInt(timestamp, 10) + "KU,TGS"
+	sessionKeyInput := clientID + strconv.FormatInt(timestamp.Unix(), 10) + "KU,TGS"
 	sessionKeyHash := sha256.Sum256([]byte(sessionKeyInput))
 	sessionKey := base64.StdEncoding.EncodeToString(sessionKeyHash[:])
 	
@@ -427,7 +583,7 @@ func (s *ASChaincode) GenerateTGT(ctx contractapi.TransactionContextInterface, c
 	tgt := TGT{
 		ClientID:   clientID,
 		SessionKey: sessionKey,
-		Timestamp:  time.Now(),
+		Timestamp:  timestamp,
 		Lifetime:   3600, // 1 hour in seconds
 	}
 	
@@ -451,27 +607,9 @@ func (s *ASChaincode) GenerateTGT(ctx contractapi.TransactionContextInterface, c
 	}
 	
 	// Get client's public key
-	clientPublicKeyPEM, err := ctx.GetStub().GetState("CLIENT_PK_" + clientID)
+	clientPublicKey, err := s.getClientPublicKey(ctx, clientID)
 	if err != nil {
 		return nil, err
-	}
-	if clientPublicKeyPEM == nil {
-		return nil, fmt.Errorf("client public key not found")
-	}
-	
-	block, _ := pem.Decode(clientPublicKeyPEM)
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block containing client public key")
-	}
-	
-	clientPublicKeyInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	
-	clientPublicKey, ok := clientPublicKeyInterface.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("not an RSA public key")
 	}
 	
 	// Encrypt the session key with client's public key
@@ -494,7 +632,7 @@ func (s *ASChaincode) GenerateTGT(ctx contractapi.TransactionContextInterface, c
 		TGTHash   string    `json:"tgtHash"`
 	}{
 		ClientID:  clientID,
-		Timestamp: time.Now(),
+		Timestamp: timestamp,
 		TGTHash:   fmt.Sprintf("%x", sha256.Sum256(tgtJSON)),
 	}
 	
@@ -536,8 +674,6 @@ func (s *ASChaincode) GetAllClientRegistrations(ctx contractapi.TransactionConte
 			return nil, err
 		}
 		
-		// Remove sensitive nonce data if present
-		client.Nonce = ""
 		clients = append(clients, &client)
 	}
 	
@@ -547,6 +683,12 @@ func (s *ASChaincode) GetAllClientRegistrations(ctx contractapi.TransactionConte
 // AllocatePeerTask assigns a task to a specific peer
 // This implements task allocation for efficient processing
 func (s *ASChaincode) AllocatePeerTask(ctx contractapi.TransactionContextInterface, peerID string, taskType string, clientID string) error {
+	// Get deterministic timestamp
+	timestamp, err := getDeterministicTimestamp(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get timestamp: %v", err)
+	}
+	
 	// Create a task record
 	task := struct {
 		PeerID      string    `json:"peerID"`
@@ -558,7 +700,7 @@ func (s *ASChaincode) AllocatePeerTask(ctx contractapi.TransactionContextInterfa
 		PeerID:      peerID,
 		TaskType:    taskType,
 		ClientID:    clientID,
-		AssignedAt:  time.Now(),
+		AssignedAt:  timestamp,
 		Status:      "assigned",
 	}
 	

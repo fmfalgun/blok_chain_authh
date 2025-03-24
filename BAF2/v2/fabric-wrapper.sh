@@ -1,10 +1,12 @@
 #!/bin/bash
 # fabric-wrapper.sh
-# A simple script to use standalone auth framework keys with Fabric network
+# A script to integrate standalone auth framework keys with the simplified Fabric client
 
 # Configuration
 KEYS_DIR="keys"
-NODE_APP_DIR="/path/to/nodejs/app"  # Update this to your Node.js app directory
+USER_NAME="admin"  # Default Fabric user
+STANDALONE_FRAMEWORK="standalone-auth-framework.go"  # The standalone key management
+FABRIC_CLIENT="simple-fabric-client.go"  # The simplified Fabric client
 
 function show_usage {
     echo "Usage: ./fabric-wrapper.sh COMMAND [OPTIONS]"
@@ -14,6 +16,7 @@ function show_usage {
     echo "  authenticate CLIENT_ID DEVICE_ID       - Authenticate using the generated keys"
     echo "  get-device-data CLIENT_ID DEVICE_ID    - Get device data after authentication"
     echo "  close-session CLIENT_ID DEVICE_ID      - Close an active session"
+    echo "  debug-rsa NONCE                        - Debug RSA operations with a specific nonce"
     echo ""
     echo "Examples:"
     echo "  ./fabric-wrapper.sh register-client client1"
@@ -41,18 +44,16 @@ case $COMMAND in
         
         # Step 1: Generate keys using standalone framework
         echo "Generating keys for client $CLIENT_ID..."
-        go run standalone-auth-framework.go generate-keys $CLIENT_ID
+        go run $STANDALONE_FRAMEWORK generate-keys $CLIENT_ID
         
-        # Step 2: Copy key to Node.js app directory if needed
-        # echo "Copying key to Node.js app directory..."
-        # cp $KEYS_DIR/$CLIENT_ID-private.pem $NODE_APP_DIR/$CLIENT_ID-private.pem
+        # Step 2: Register client with Fabric using simplified client
+        echo "Registering client with Fabric (using $USER_NAME)..."
+        go run $FABRIC_CLIENT register-client $USER_NAME $CLIENT_ID
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to register client with Fabric. See error message above."
+            exit 1
+        fi
         
-        # Step 3: Register client with Fabric using Node.js app
-        echo "Registering client with Fabric (using admin)..."
-        # You can either use a Node.js script or your working Fabric command
-        # Example: node register-client.js admin $CLIENT_ID
-        
-        # For now, we'll simulate this step
         echo "SUCCESS: Client $CLIENT_ID registered with Authentication Server"
         ;;
         
@@ -68,17 +69,16 @@ case $COMMAND in
         
         # Step 1: Generate keys using standalone framework
         echo "Generating keys for device $DEVICE_ID..."
-        go run standalone-auth-framework.go generate-keys $DEVICE_ID
+        go run $STANDALONE_FRAMEWORK generate-keys $DEVICE_ID
         
-        # Step 2: Copy key to Node.js app directory if needed
-        # echo "Copying key to Node.js app directory..."
-        # cp $KEYS_DIR/$DEVICE_ID-private.pem $NODE_APP_DIR/$DEVICE_ID-private.pem
+        # Step 2: Register device with Fabric using simplified client
+        echo "Registering device with Fabric (using $USER_NAME)..."
+        go run $FABRIC_CLIENT register-device $USER_NAME $DEVICE_ID $CAPABILITIES
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to register device with Fabric. See error message above."
+            exit 1
+        fi
         
-        # Step 3: Register device with Fabric using Node.js app
-        echo "Registering device with Fabric (using admin)..."
-        # Example: node register-device.js admin $DEVICE_ID $CAPABILITIES
-        
-        # For now, we'll simulate this step
         echo "SUCCESS: IoT device $DEVICE_ID registered with capabilities: $CAPABILITIES"
         ;;
         
@@ -101,18 +101,14 @@ case $COMMAND in
             exit 1
         fi
         
-        # Step 2: Simulate authentication first to verify keys work
-        echo "Simulating authentication..."
-        go run standalone-auth-framework.go simulate-auth $CLIENT_ID test-nonce-123
+        # Step 2: Perform authentication using simplified client
+        echo "Authenticating with Fabric (using $USER_NAME)..."
+        go run $FABRIC_CLIENT authenticate $USER_NAME $CLIENT_ID $DEVICE_ID
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to authenticate with Fabric. See error message above."
+            exit 1
+        fi
         
-        # Step 3: Perform actual authentication with Fabric
-        echo "Authenticating with Fabric (using admin)..."
-        # Example: node authenticate.js admin $CLIENT_ID $DEVICE_ID
-        
-        # For now, we'll simulate this step
-        echo "Step 1: Getting TGT from Authentication Server..."
-        echo "Step 2: Getting Service Ticket from Ticket Granting Server..."
-        echo "Step 3: Authenticating with IoT Service Validator and accessing device..."
         echo "SUCCESS: Authentication successful! You can now access the IoT device."
         ;;
         
@@ -125,19 +121,13 @@ case $COMMAND in
         CLIENT_ID=$1
         DEVICE_ID=$2
         
-        # Step 1: Verify authentication has been done
-        echo "Checking if session exists..."
-        # This would check for a session file in a real implementation
-        
-        # Step 2: Get device data from Fabric
-        echo "Getting device data from Fabric (using admin)..."
-        # Example: node get-device-data.js admin $CLIENT_ID $DEVICE_ID
-        
-        # For now, we'll simulate this step
-        echo "Retrieved data for device $DEVICE_ID:"
-        echo "  Device ID: $DEVICE_ID"
-        echo "  Capabilities: temperature, humidity"
-        echo "  Status: active"
+        # Get device data using simplified client
+        echo "Getting device data from Fabric (using $USER_NAME)..."
+        go run $FABRIC_CLIENT get-device-data $USER_NAME $CLIENT_ID $DEVICE_ID
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to get device data from Fabric. See error message above."
+            exit 1
+        fi
         ;;
         
     close-session)
@@ -149,16 +139,26 @@ case $COMMAND in
         CLIENT_ID=$1
         DEVICE_ID=$2
         
-        # Step 1: Verify session exists
-        echo "Checking if session exists..."
-        # This would check for a session file in a real implementation
+        # Close session using simplified client
+        echo "Closing session in Fabric (using $USER_NAME)..."
+        go run $FABRIC_CLIENT close-session $USER_NAME $CLIENT_ID $DEVICE_ID
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to close session in Fabric. See error message above."
+            exit 1
+        fi
+        ;;
         
-        # Step 2: Close session in Fabric
-        echo "Closing session in Fabric (using admin)..."
-        # Example: node close-session.js admin $CLIENT_ID $DEVICE_ID
+    debug-rsa)
+        if [ $# -lt 1 ]; then
+            echo "Error: Missing nonce"
+            echo "Usage: ./fabric-wrapper.sh debug-rsa <nonce>"
+            exit 1
+        fi
+        NONCE=$1
         
-        # For now, we'll simulate this step
-        echo "SUCCESS: Closed session for device $DEVICE_ID"
+        # Run RSA debugging with the standalone framework
+        echo "Running RSA debugging with nonce: $NONCE"
+        go run $STANDALONE_FRAMEWORK debug-rsa $NONCE
         ;;
         
     *)

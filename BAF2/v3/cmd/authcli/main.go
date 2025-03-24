@@ -21,6 +21,7 @@ var (
 	deviceID        string
 	capabilities    []string
 	sessionDir      string
+	debugMode       bool // Added debug mode flag
 	
 	// Global variables
 	log *logger.Logger
@@ -36,6 +37,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&walletPath, "wallet", "wallet", "Path to wallet directory")
 	rootCmd.PersistentFlags().StringVar(&identityName, "identity", "admin", "Identity name to use")
 	rootCmd.PersistentFlags().StringVar(&sessionDir, "session-dir", "sessions", "Path to session directory")
+	rootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "Enable debug mode for Fabric client") // Added debug flag
 	
 	// Register client command flags
 	registerClientCmd.Flags().StringVar(&clientID, "client-id", "", "Client ID to register")
@@ -101,6 +103,7 @@ var registerClientCmd = &cobra.Command{
 		fabricClient, err := fabric.NewClient(fabric.ClientOptions{
 			ConfigPath:  configPath,
 			WalletPath:  walletPath,
+			Debug:       debugMode, // Enable debug mode based on flag
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create Fabric client: %v", err)
@@ -136,6 +139,7 @@ var registerDeviceCmd = &cobra.Command{
 		fabricClient, err := fabric.NewClient(fabric.ClientOptions{
 			ConfigPath:  configPath,
 			WalletPath:  walletPath,
+			Debug:       debugMode, // Enable debug mode based on flag
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create Fabric client: %v", err)
@@ -170,6 +174,7 @@ var authenticateCmd = &cobra.Command{
 		fabricClient, err := fabric.NewClient(fabric.ClientOptions{
 			ConfigPath:  configPath,
 			WalletPath:  walletPath,
+			Debug:       debugMode, // Enable debug mode based on flag
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create Fabric client: %v", err)
@@ -205,6 +210,7 @@ var accessDeviceCmd = &cobra.Command{
 		fabricClient, err := fabric.NewClient(fabric.ClientOptions{
 			ConfigPath:  configPath,
 			WalletPath:  walletPath,
+			Debug:       debugMode, // Enable debug mode based on flag
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create Fabric client: %v", err)
@@ -249,6 +255,7 @@ var getDeviceDataCmd = &cobra.Command{
 		fabricClient, err := fabric.NewClient(fabric.ClientOptions{
 			ConfigPath:  configPath,
 			WalletPath:  walletPath,
+			Debug:       debugMode, // Enable debug mode based on flag
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create Fabric client: %v", err)
@@ -294,7 +301,6 @@ var closeSessionCmd = &cobra.Command{
 		sessionManager := auth.NewSessionManager(sessionDir)
 		
 		// Get session
-		
 		_, err := sessionManager.GetSession(clientID, deviceID)
 		if err != nil {
 			return fmt.Errorf("failed to get session: %v", err)
@@ -304,6 +310,7 @@ var closeSessionCmd = &cobra.Command{
 		fabricClient, err := fabric.NewClient(fabric.ClientOptions{
 			ConfigPath:  configPath,
 			WalletPath:  walletPath,
+			Debug:       debugMode, // Enable debug mode based on flag
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create Fabric client: %v", err)

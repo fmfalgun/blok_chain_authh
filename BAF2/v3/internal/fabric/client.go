@@ -3,7 +3,9 @@ package fabric
 import (
 	"os"
 	"path/filepath"
+	"fmt"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/pkg/errors"
@@ -23,6 +25,7 @@ type Client struct {
 	channelName string
 	wallet      *Wallet
 	gateway     *gateway.Gateway
+	debug       bool
 }
 
 // ClientOptions contains options for creating a Fabric client
@@ -30,38 +33,7 @@ type ClientOptions struct {
 	ConfigPath  string
 	ChannelName string
 	WalletPath  string
-}
-
-// Connect connects to the Fabric network using the specified identity
-// This method uses proper TLS validation without skipping verification
-func (c *Client) Connect(identity string) error {
-	// Ensure identity exists in wallet
-	if !c.wallet.Exists(identity) {
-		return errors.Errorf("identity '%s' not found in wallet", identity)
-	}
-	
-	// Ensure connection profile exists
-	if _, err := os.Stat(c.configPath); os.IsNotExist(err) {
-		return errors.Errorf("connection profile not found at '%s'", c.configPath)
-	}
-	
-	// Load connection profile
-	ccpPath, err := filepath.Abs(c.configPath)
-	if err != nil {
-		return errors.Wrap(err, "failed to get absolute path for connection profile")
-	}
-	
-	// Connect to gateway with proper TLS validation
-	gw, err := gateway.Connect(
-		gateway.WithConfig(config.FromFile(ccpPath)),
-		gateway.WithIdentity(c.wallet.wallet, identity),
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to gateway")
-	}
-	
-	c.gateway = gw
-	return nil
+	Debug       bool
 }
 
 // NewClient creates a new Fabric client
@@ -85,12 +57,52 @@ func NewClient(options ClientOptions) (*Client, error) {
 		configPath:  options.ConfigPath,
 		channelName: options.ChannelName,
 		wallet:      wallet,
+		debug:       options.Debug,
 	}, nil
 }
 
 // DefaultClient creates a client with default options
 func DefaultClient() (*Client, error) {
 	return NewClient(ClientOptions{})
+}
+
+// Connect connects to the Fabric network using the specified identity
+func (c *Client) Connect(identity string) error {
+	// Ensure identity exists in wallet
+	if !c.wallet.Exists(identity) {
+		return errors.Errorf("identity '%s' not found in wallet", identity)
+	}
+	
+	// Ensure connection profile exists
+	if _, err := os.Stat(c.configPath); os.IsNotExist(err) {
+		return errors.Errorf("connection profile not found at '%s'", c.configPath)
+	}
+	
+	// Load connection profile
+	ccpPath, err := filepath.Abs(c.configPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to get absolute path for connection profile")
+	}
+	
+	if c.debug {
+		fmt.Printf("Using connection profile at: %s\n", ccpPath)
+	}
+	
+	configProvider := func() ([]core.ConfigBackend, error) {
+		return config.FromFile(ccpPath)()
+	}
+	
+	// Connect to gateway
+	gw, err := gateway.Connect(
+		gateway.WithConfig(configProvider),
+		gateway.WithIdentity(c.wallet.wallet, identity),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to gateway")
+	}
+	
+	c.gateway = gw
+	return nil
 }
 
 // GetNetwork returns the Fabric network
@@ -114,6 +126,10 @@ func (c *Client) GetContract(contractID string) (*gateway.Contract, error) {
 		return nil, err
 	}
 	
+	if c.debug {
+		fmt.Printf("Getting contract: %s\n", contractID)
+	}
+	
 	contract := network.GetContract(contractID)
 	return contract, nil
 }
@@ -134,4 +150,9 @@ func (c *Client) GetWallet() *Wallet {
 // EnsureIdentity ensures that the specified identity exists in the wallet
 func (c *Client) EnsureIdentity(identity string) error {
 	return c.wallet.EnsureIdentity(identity)
+}
+
+// SetDebug enables or disables debug output
+func (c *Client) SetDebug(debug bool) {
+	c.debug = debug
 }
