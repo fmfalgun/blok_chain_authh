@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
@@ -73,6 +74,14 @@ type PredefinedKeys struct {
 	ISVPublicKey  string
 }
 
+// Helper function for string truncation in logs
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // getDeterministicTimestamp gets a deterministic timestamp from the transaction context
 func getDeterministicTimestamp(ctx contractapi.TransactionContextInterface) (time.Time, error) {
     // Get timestamp from transaction context - this will be identical across all peers
@@ -96,11 +105,18 @@ func (s *ISVChaincode) Initialize(ctx contractapi.TransactionContextInterface) e
 	
 	if existingKey != nil {
 		// Already initialized, skip to maintain consistency
+		fmt.Println("ISV chaincode already initialized, skipping initialization")
 		return nil
 	}
 	
 	// Use predefined keys instead of generating them dynamically
 	keys := getPredefinedKeys()
+	
+	// Log the keys being used (truncated for security)
+	fmt.Printf("ISV private key (first 50 chars): %s...\n", 
+		keys.ISVPrivateKey[:min(50, len(keys.ISVPrivateKey))])
+	fmt.Printf("ISV public key (first 50 chars): %s...\n", 
+		keys.ISVPublicKey[:min(50, len(keys.ISVPublicKey))])
 	
 	// Store the ISV private key
 	err = ctx.GetStub().PutState("ISV_PRIVATE_KEY", []byte(keys.ISVPrivateKey))
@@ -120,7 +136,16 @@ func (s *ISVChaincode) Initialize(ctx contractapi.TransactionContextInterface) e
 		return fmt.Errorf("failed to mark ISV as initialized: %v", err)
 	}
 	
-	fmt.Println("ISV chaincode initialized successfully")
+	// Verify key storage
+	verifyKey, err := ctx.GetStub().GetState("ISV_PRIVATE_KEY")
+	if err != nil {
+		return fmt.Errorf("failed to verify key storage: %v", err)
+	}
+	if verifyKey == nil {
+		return fmt.Errorf("verification failed: ISV private key not stored correctly")
+	}
+	
+	fmt.Println("ISV chaincode successfully initialized")
 	return nil
 }
 
@@ -180,14 +205,29 @@ func (s *ISVChaincode) getPrivateKey(ctx contractapi.TransactionContextInterface
 		return nil, fmt.Errorf("ISV private key not found")
 	}
 	
+	// Add debug logging
+	fmt.Printf("Retrieved ISV private key PEM (first 50 chars): %s...\n", 
+		string(privateKeyPEM)[:min(50, len(string(privateKeyPEM)))])
+	
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 	
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	// Ensure we're using the right parse function for the key format
+	var privateKey *rsa.PrivateKey
+	privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %v", err)
+		// Try alternative parsing in case the key is in a different format
+		parsedKey, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to parse private key (both PKCS1 and PKCS8): %v, %v", err, err2)
+		}
+		var ok bool
+		privateKey, ok = parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("parsed key is not an RSA private key")
+		}
 	}
 	
 	return privateKey, nil
@@ -208,6 +248,10 @@ func (s *ISVChaincode) getDevicePublicKey(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal device data: %v", err)
 	}
+	
+	// Debug log for device public key
+	fmt.Printf("Device %s public key (first 50 chars): %s...\n", 
+		deviceID, device.PublicKey[:min(50, len(device.PublicKey))])
 	
 	block, _ := pem.Decode([]byte(device.PublicKey))
 	if block == nil {
@@ -234,11 +278,13 @@ func (s *ISVChaincode) getDevicePublicKey(ctx contractapi.TransactionContextInte
 func (s *ISVChaincode) RegisterIoTDevice(ctx contractapi.TransactionContextInterface, deviceID string, devicePublicKeyPEM string, capabilitiesJSON string) error {
 	// Debug log
 	fmt.Printf("Registering IoT device: %s\n", deviceID)
-	fmt.Printf("Device public key: %s\n", devicePublicKeyPEM)
+	fmt.Printf("Device public key (first 50 chars): %s...\n", 
+		devicePublicKeyPEM[:min(50, len(devicePublicKeyPEM))])
 	fmt.Printf("Capabilities: %s\n", capabilitiesJSON)
 	
-	// Check if device already exists
-	existingDeviceJSON, err := ctx.GetStub().GetState("DEVICE_" + deviceID)
+	// Check if device already exists - use only DEVICE_ prefix consistently
+	deviceKey := "DEVICE_" + deviceID
+	existingDeviceJSON, err := ctx.GetStub().GetState(deviceKey)
 	if err != nil {
 		return fmt.Errorf("failed to read from world state: %v", err)
 	}
@@ -285,13 +331,14 @@ func (s *ISVChaincode) RegisterIoTDevice(ctx contractapi.TransactionContextInter
 		return fmt.Errorf("failed to marshal device data: %v", err)
 	}
 	
-	// Store device data in the world state
-	err = ctx.GetStub().PutState("DEVICE_"+deviceID, deviceJSON)
+	// Store device data using ONLY the DEVICE_ prefix
+	err = ctx.GetStub().PutState(deviceKey, deviceJSON)
 	if err != nil {
 		return fmt.Errorf("failed to store device data: %v", err)
 	}
 	
 	// Record this registration on the blockchain with deterministic ID
+	// Use a different prefix for events
 	registrationEvent := struct {
 		DeviceID      string    `json:"deviceID"`
 		Timestamp     time.Time `json:"timestamp"`
@@ -307,8 +354,8 @@ func (s *ISVChaincode) RegisterIoTDevice(ctx contractapi.TransactionContextInter
 		return fmt.Errorf("failed to marshal registration event: %v", err)
 	}
 	
-	// Create a deterministic registration ID
-	registrationID := "DEVICE_REG_" + deviceID + "_" + strconv.FormatInt(registrationTime.Unix(), 10)
+	// Use a clearly different prefix for events
+	registrationID := "DEVICE_EVENT_" + deviceID + "_" + strconv.FormatInt(registrationTime.Unix(), 10)
 	err = ctx.GetStub().PutState(registrationID, registrationEventJSON)
 	if err != nil {
 		return fmt.Errorf("failed to store registration event: %v", err)
@@ -325,7 +372,8 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 	fmt.Printf("Updating device status: %s -> %s\n", deviceID, status)
 	
 	// Retrieve the device record
-	deviceJSON, err := ctx.GetStub().GetState("DEVICE_" + deviceID)
+	deviceKey := "DEVICE_" + deviceID
+	deviceJSON, err := ctx.GetStub().GetState(deviceKey)
 	if err != nil {
 		return fmt.Errorf("failed to read device data: %v", err)
 	}
@@ -350,6 +398,11 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 		return fmt.Errorf("failed to get update timestamp: %v", err)
 	}
 	
+	// Ensure deviceID field matches the ID from the key
+	if device.DeviceID != deviceID {
+		device.DeviceID = deviceID
+	}
+	
 	device.Status = status
 	device.LastSeen = updateTime
 	
@@ -359,7 +412,7 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 	}
 	
 	// Store the updated device record
-	err = ctx.GetStub().PutState("DEVICE_"+deviceID, updatedDeviceJSON)
+	err = ctx.GetStub().PutState(deviceKey, updatedDeviceJSON)
 	if err != nil {
 		return fmt.Errorf("failed to store updated device data: %v", err)
 	}
@@ -374,7 +427,7 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 		Status:        status,
 		Timestamp:     updateTime,
 	}
-	
+
 	statusUpdateEventJSON, err := json.Marshal(statusUpdateEvent)
 	if err != nil {
 		return fmt.Errorf("failed to marshal status update event: %v", err)
@@ -396,8 +449,10 @@ func (s *ISVChaincode) UpdateDeviceStatus(ctx contractapi.TransactionContextInte
 func (s *ISVChaincode) CheckDeviceAvailability(ctx contractapi.TransactionContextInterface, deviceID string) (bool, error) {
 	// Debug log
 	fmt.Printf("Checking availability of device: %s\n", deviceID)
-// Retrieve the device record
-	deviceJSON, err := ctx.GetStub().GetState("DEVICE_" + deviceID)
+	
+	// Retrieve the device record
+	deviceKey := "DEVICE_" + deviceID
+	deviceJSON, err := ctx.GetStub().GetState(deviceKey)
 	if err != nil {
 		return false, fmt.Errorf("failed to read device data: %v", err)
 	}
@@ -426,7 +481,8 @@ func (s *ISVChaincode) CheckDeviceAvailability(ctx contractapi.TransactionContex
 // and Step 5: Client Requests Service from ISV from the paper
 func (s *ISVChaincode) ValidateServiceTicket(ctx contractapi.TransactionContextInterface, encryptedServiceTicket string) (*ServiceTicket, error) {
 	// Debug log
-	fmt.Printf("Validating service ticket: %s\n", encryptedServiceTicket)
+	fmt.Printf("Validating service ticket (first 50 chars): %s...\n", 
+		encryptedServiceTicket[:min(50, len(encryptedServiceTicket))])
 	
 	// Decode the base64 encoded encrypted service ticket
 	serviceTicketBytes, err := base64.StdEncoding.DecodeString(encryptedServiceTicket)
@@ -440,20 +496,26 @@ func (s *ISVChaincode) ValidateServiceTicket(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("failed to get ISV private key: %v", err)
 	}
 	
-	// Decrypt the service ticket using ISV's private key
-	// This implements: M = TSS^dISV = (M^eISV)^dISV mod nISV from the paper
+	// Use a more robust decryption approach
 	var decryptedServiceTicketBytes []byte
-	// Use a recovery mechanism to handle potential decryption issues
+	
+	// Use recovery for potential panics
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("service ticket decryption panicked: %v", r)
+			err = fmt.Errorf("panic during service ticket decryption: %v", r)
 		}
 	}()
 	
+	// Decrypt the service ticket using ISV's private key
+	// This implements: M = TSS^dISV = (M^eISV)^dISV mod nISV from the paper
 	decryptedServiceTicketBytes, err = rsa.DecryptPKCS1v15(rand.Reader, privateKey, serviceTicketBytes)
 	if err != nil {
 		return nil, fmt.Errorf("service ticket decryption failed: %v", err)
 	}
+	
+	// Log the decrypted data
+	fmt.Printf("Decrypted service ticket bytes (first 50 chars): %s...\n", 
+		string(decryptedServiceTicketBytes)[:min(50, len(string(decryptedServiceTicketBytes)))])
 	
 	// Parse the decrypted service ticket
 	var serviceTicket ServiceTicket
@@ -463,7 +525,7 @@ func (s *ISVChaincode) ValidateServiceTicket(ctx contractapi.TransactionContextI
 	}
 	
 	// Debug log
-	fmt.Printf("Decrypted service ticket: ClientID=%s, SessionKey=%s\n", 
+	fmt.Printf("Parsed service ticket: ClientID=%s, SessionKey=%s\n", 
 		serviceTicket.ClientID, serviceTicket.SessionKey)
 	
 	// Validate the service ticket timestamp and lifetime
@@ -568,7 +630,8 @@ func (s *ISVChaincode) ProcessServiceRequest(ctx contractapi.TransactionContextI
 	}
 	
 	// Update device status to "busy"
-	deviceJSON, err := ctx.GetStub().GetState("DEVICE_" + request.DeviceID)
+	deviceKey := "DEVICE_" + request.DeviceID
+	deviceJSON, err := ctx.GetStub().GetState(deviceKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get device data: %v", err)
 	}
@@ -585,7 +648,7 @@ func (s *ISVChaincode) ProcessServiceRequest(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("failed to marshal updated device data: %v", err)
 	}
 	
-	err = ctx.GetStub().PutState("DEVICE_"+request.DeviceID, updatedDeviceJSON)
+	err = ctx.GetStub().PutState(deviceKey, updatedDeviceJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store updated device data: %v", err)
 	}
@@ -738,7 +801,8 @@ func (s *ISVChaincode) CloseSession(ctx contractapi.TransactionContextInterface,
 	}
 	
 	// Update device status back to "active"
-	deviceJSON, err := ctx.GetStub().GetState("DEVICE_" + session.DeviceID)
+	deviceKey := "DEVICE_" + session.DeviceID
+	deviceJSON, err := ctx.GetStub().GetState(deviceKey)
 	if err != nil {
 		return fmt.Errorf("failed to get device data: %v", err)
 	}
@@ -756,7 +820,7 @@ func (s *ISVChaincode) CloseSession(ctx contractapi.TransactionContextInterface,
 		return fmt.Errorf("failed to marshal updated device data: %v", err)
 	}
 	
-	err = ctx.GetStub().PutState("DEVICE_"+session.DeviceID, updatedDeviceJSON)
+	err = ctx.GetStub().PutState(deviceKey, updatedDeviceJSON)
 	if err != nil {
 		return fmt.Errorf("failed to store updated device data: %v", err)
 	}
@@ -770,7 +834,7 @@ func (s *ISVChaincode) GetAllIoTDevices(ctx contractapi.TransactionContextInterf
 	// Debug log
 	fmt.Println("Getting all IoT devices")
 	
-	// Get all IoT devices from the world state
+	// Get only records with DEVICE_ prefix
 	resultsIterator, err := ctx.GetStub().GetStateByRange("DEVICE_", "DEVICE_~")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get device records: %v", err)
@@ -784,6 +848,13 @@ func (s *ISVChaincode) GetAllIoTDevices(ctx contractapi.TransactionContextInterf
 			return nil, fmt.Errorf("failed to iterate device records: %v", err)
 		}
 		
+		// Check if this is a device record vs. an event record
+		key := queryResponse.Key
+		if !strings.HasPrefix(key, "DEVICE_") || strings.HasPrefix(key, "DEVICE_EVENT_") {
+			// Skip event records
+			continue
+		}
+		
 		var device IoTDevice
 		err = json.Unmarshal(queryResponse.Value, &device)
 		if err != nil {
@@ -793,7 +864,7 @@ func (s *ISVChaincode) GetAllIoTDevices(ctx contractapi.TransactionContextInterf
 		}
 		
 		// Extract device ID from the key (remove the "DEVICE_" prefix)
-		deviceID := queryResponse.Key[7:] // Skip the "DEVICE_" prefix
+		deviceID := key[7:] // Skip the "DEVICE_" prefix
 		
 		// Ensure the ID field matches the key used to store it
 		if device.DeviceID != deviceID {
@@ -854,4 +925,4 @@ func main() {
 	if err := chaincode.Start(); err != nil {
 		fmt.Printf("Error starting ISV chaincode: %s", err.Error())
 	}
-}	
+}

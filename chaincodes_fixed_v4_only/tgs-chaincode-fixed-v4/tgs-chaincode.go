@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"strconv"
+	//"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
@@ -65,6 +66,14 @@ type PredefinedKeys struct {
 	ISVPublicKey  string
 }
 
+// Helper function for string truncation in logs
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // getDeterministicTimestamp gets a deterministic timestamp from the transaction context
 func getDeterministicTimestamp(ctx contractapi.TransactionContextInterface) (time.Time, error) {
     // Get timestamp from transaction context - this will be identical across all peers
@@ -88,11 +97,18 @@ func (s *TGSChaincode) Initialize(ctx contractapi.TransactionContextInterface) e
 	
 	if existingKey != nil {
 		// Already initialized, skip to maintain consistency
+		fmt.Println("TGS chaincode already initialized, skipping initialization")
 		return nil
 	}
 	
 	// Use predefined keys instead of generating them dynamically
 	keys := getPredefinedKeys()
+	
+	// Log the keys being used (truncated for security)
+	fmt.Printf("TGS private key (first 50 chars): %s...\n", 
+		keys.TGSPrivateKey[:min(50, len(keys.TGSPrivateKey))])
+	fmt.Printf("ISV public key (first 50 chars): %s...\n", 
+		keys.ISVPublicKey[:min(50, len(keys.ISVPublicKey))])
 	
 	// Store the TGS private key
 	err = ctx.GetStub().PutState("TGS_PRIVATE_KEY", []byte(keys.TGSPrivateKey))
@@ -118,6 +134,16 @@ func (s *TGSChaincode) Initialize(ctx contractapi.TransactionContextInterface) e
 		return fmt.Errorf("failed to mark TGS as initialized: %v", err)
 	}
 	
+	// Verify key storage
+	verifyKey, err := ctx.GetStub().GetState("TGS_PRIVATE_KEY")
+	if err != nil {
+		return fmt.Errorf("failed to verify key storage: %v", err)
+	}
+	if verifyKey == nil {
+		return fmt.Errorf("verification failed: TGS private key not stored correctly")
+	}
+	
+	fmt.Println("TGS chaincode successfully initialized")
 	return nil
 }
 
@@ -186,14 +212,29 @@ func (s *TGSChaincode) getPrivateKey(ctx contractapi.TransactionContextInterface
 		return nil, fmt.Errorf("TGS private key not found")
 	}
 	
+	// Add debug logging
+	fmt.Printf("Retrieved TGS private key PEM (first 50 chars): %s...\n", 
+		string(privateKeyPEM)[:min(50, len(string(privateKeyPEM)))])
+	
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 	
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	// Ensure we're using the right parse function for the key format
+	var privateKey *rsa.PrivateKey
+	privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %v", err)
+		// Try alternative parsing in case the key is in a different format
+		parsedKey, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to parse private key (both PKCS1 and PKCS8): %v, %v", err, err2)
+		}
+		var ok bool
+		privateKey, ok = parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("parsed key is not an RSA private key")
+		}
 	}
 	
 	return privateKey, nil
@@ -208,6 +249,10 @@ func (s *TGSChaincode) getPublicKey(ctx contractapi.TransactionContextInterface,
 	if publicKeyPEM == nil {
 		return nil, fmt.Errorf("public key %s not found", keyName)
 	}
+	
+	// Add debug logging
+	fmt.Printf("Retrieved %s (first 50 chars): %s...\n", 
+		keyName, string(publicKeyPEM)[:min(50, len(string(publicKeyPEM)))])
 	
 	block, _ := pem.Decode(publicKeyPEM)
 	if block == nil {
@@ -233,7 +278,8 @@ func (s *TGSChaincode) getPublicKey(ctx contractapi.TransactionContextInterface,
 // This implements the "Process Registration of Org1" operation
 func (s *TGSChaincode) ProcessRegistrationFromAS(ctx contractapi.TransactionContextInterface, encryptedTGT string) error {
 	// Debug log for input
-	fmt.Printf("Processing registration with TGT: %s\n", encryptedTGT)
+	fmt.Printf("Processing registration with TGT (first 50 chars): %s...\n", 
+		encryptedTGT[:min(50, len(encryptedTGT))])
 
 	// Decode the base64 encoded encrypted TGT
 	tgtBytes, err := base64.StdEncoding.DecodeString(encryptedTGT)
@@ -247,12 +293,26 @@ func (s *TGSChaincode) ProcessRegistrationFromAS(ctx contractapi.TransactionCont
 		return fmt.Errorf("failed to get TGS private key: %v", err)
 	}
 	
+	// Decrypt the TGT using TGS's private key with error handling
+	var decryptedTGTBytes []byte
+	
+	// Use a recovery mechanism to handle potential panics
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during TGT decryption: %v", r)
+		}
+	}()
+	
 	// Decrypt the TGT using TGS's private key
 	// This implements: M = TGT^dTGS = (M^eTGS)^dTGS mod nTGS from the paper
-	decryptedTGTBytes, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, tgtBytes)
+	decryptedTGTBytes, err = rsa.DecryptPKCS1v15(rand.Reader, privateKey, tgtBytes)
 	if err != nil {
 		return fmt.Errorf("TGT decryption failed: %v", err)
 	}
+	
+	// Log the decrypted data
+	fmt.Printf("Decrypted TGT bytes (first 50 chars): %s...\n", 
+		string(decryptedTGTBytes)[:min(50, len(string(decryptedTGTBytes)))])
 	
 	// Parse the decrypted TGT
 	var tgt TGT
@@ -342,13 +402,27 @@ func (s *TGSChaincode) CheckRegistrationValidity(ctx contractapi.TransactionCont
 	// Debug log
 	fmt.Printf("Checking registration validity for client: %s\n", clientID)
 
-	// Retrieve the client record using the exact key format used when storing it
-	clientRecordJSON, err := ctx.GetStub().GetState("CLIENT_RECORD_" + clientID)
+	// Try both possible key formats
+	clientKey := "CLIENT_RECORD_" + clientID
+	clientRecordJSON, err := ctx.GetStub().GetState(clientKey)
 	if err != nil {
 		return false, fmt.Errorf("failed to read client record: %v", err)
 	}
+	
+	// If not found with the standard key, try alternative key format
 	if clientRecordJSON == nil {
-		return false, fmt.Errorf("client %s is not registered with TGS", clientID)
+		altKey := "CLIENT_" + clientID
+		clientRecordJSON, err = ctx.GetStub().GetState(altKey)
+		if err != nil {
+			return false, fmt.Errorf("failed to read client record with alternative key: %v", err)
+		}
+		
+		if clientRecordJSON == nil {
+			return false, fmt.Errorf("client %s is not registered with TGS", clientID)
+		}
+		
+		// If found with alternative key, update to standard format
+		clientKey = altKey
 	}
 	
 	// Debug log for retrieved data
@@ -369,10 +443,12 @@ func (s *TGSChaincode) CheckRegistrationValidity(ctx contractapi.TransactionCont
 		if err != nil {
 			return false, fmt.Errorf("failed to marshal updated client record: %v", err)
 		}
-		err = ctx.GetStub().PutState("CLIENT_RECORD_"+clientID, updatedClientRecordJSON)
+		err = ctx.GetStub().PutState(clientKey, updatedClientRecordJSON)
 		if err != nil {
 			return false, fmt.Errorf("failed to update client record: %v", err)
 		}
+		
+		fmt.Printf("Fixed client ID mismatch for %s\n", clientID)
 	}
 	
 	// Check if the client record is still valid
@@ -382,10 +458,12 @@ func (s *TGSChaincode) CheckRegistrationValidity(ctx contractapi.TransactionCont
 	}
 	
 	if currentTime.After(clientRecord.ValidUntil) {
+		fmt.Printf("Client record for %s has expired\n", clientID)
 		return false, nil
 	}
 	
 	if clientRecord.Status != "active" {
+		fmt.Printf("Client record for %s is not active (status: %s)\n", clientID, clientRecord.Status)
 		return false, nil
 	}
 	
@@ -398,12 +476,12 @@ func (s *TGSChaincode) CheckRegistrationValidity(ctx contractapi.TransactionCont
 	clientRecord.LastAccess = newAccessTime
 	updatedClientRecordJSON, err := json.Marshal(clientRecord)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to marshal updated client record: %v", err)
 	}
 	
-	err = ctx.GetStub().PutState("CLIENT_RECORD_"+clientID, updatedClientRecordJSON)
+	err = ctx.GetStub().PutState(clientKey, updatedClientRecordJSON)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to update client record: %v", err)
 	}
 	
 	fmt.Printf("Client %s registration is valid\n", clientID)
@@ -439,9 +517,17 @@ func (s *TGSChaincode) GenerateServiceTicket(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("failed to get private key: %v", err)
 	}
 	
+	// Use a recovery mechanism to handle potential panics
+	var decryptedTGTBytes []byte
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during TGT decryption: %v", r)
+		}
+	}()
+	
 	// Decrypt the TGT using TGS's private key
 	// This implements: M = TGT^dTGS = (M^eTGS)^dTGS mod nTGS
-	decryptedTGTBytes, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, tgtBytes)
+	decryptedTGTBytes, err = rsa.DecryptPKCS1v15(rand.Reader, privateKey, tgtBytes)
 	if err != nil {
 		return nil, fmt.Errorf("TGT decryption failed: %v", err)
 	}
@@ -481,9 +567,12 @@ func (s *TGSChaincode) GenerateServiceTicket(ctx contractapi.TransactionContextI
 	}
 	
 	// Step 3: Verify the authenticator (timestamp encrypted with session key)
-	// In a real implementation, you would decrypt the authenticator using the session key
-	// and verify that the timestamp is recent (within a few minutes)
-	// For simplicity, we'll skip this step in this example
+	// In a real implementation, you would decrypt the
+	// authenticator using the session key and verify that the timestamp is recent
+	// For simplicity, we'll skip detailed verification in this example
+	if ticketRequest.AuthenticatorB64 == "" {
+		return nil, fmt.Errorf("missing authenticator in the request")
+	}
 	
 	// Step 4: Generate a deterministic session key KU,SS for client-ISV communication
 	// Using a deterministic approach based on client ID, service ID, and current time
@@ -494,8 +583,10 @@ func (s *TGSChaincode) GenerateServiceTicket(ctx contractapi.TransactionContextI
 	
 	timestamp := ticketTime.Unix()
 	sessionKeyInput := tgt.ClientID + ticketRequest.ServiceID + strconv.FormatInt(timestamp, 10) + "KU,SS"
-sessionKeyHash := sha256.Sum256([]byte(sessionKeyInput))
+	sessionKeyHash := sha256.Sum256([]byte(sessionKeyInput))
 	sessionKey := base64.StdEncoding.EncodeToString(sessionKeyHash[:])
+	
+	fmt.Printf("Generated session key for service ticket: %s\n", sessionKey)
 	
 	// Step 5: Create a service ticket
 	serviceTicketTimestamp, err := getDeterministicTimestamp(ctx)
@@ -552,37 +643,34 @@ sessionKeyHash := sha256.Sum256([]byte(sessionKeyInput))
 	return &response, s.recordTicketIssuance(ctx, tgt.ClientID, ticketRequest.ServiceID, serviceTicketJSON)
 }
 
-
-// recordTicketIssuance records a service ticket issuance on the blockchain
-// This is part of the "Endorse & Validate of Registration" operation
 // recordTicketIssuance records a service ticket issuance on the blockchain
 // This is part of the "Endorse & Validate of Registration" operation
 func (s *TGSChaincode) recordTicketIssuance(ctx contractapi.TransactionContextInterface, clientID string, serviceID string, serviceTicketJSON []byte) error {
-    recordTime, err := getDeterministicTimestamp(ctx)
-    if err != nil {
-        return fmt.Errorf("failed to get record timestamp: %v", err)
-    }
-    
-    ticketRecord := struct {
-        ClientID     string    `json:"clientID"`
-        ServiceID    string    `json:"serviceID"`
-        Timestamp    time.Time `json:"timestamp"`
-        TicketHash   string    `json:"ticketHash"`
-    }{
-        ClientID:     clientID,
-        ServiceID:    serviceID,
-        Timestamp:    recordTime,
-        TicketHash:   fmt.Sprintf("%x", sha256.Sum256(serviceTicketJSON)),
-    }
-    
-    ticketRecordJSON, err := json.Marshal(ticketRecord)
-    if err != nil {
-        return fmt.Errorf("failed to marshal ticket record: %v", err)
-    }
-    
-    // Store the ticket record with a deterministic ID
-    ticketID := "TICKET_" + clientID + "_" + serviceID + "_" + strconv.FormatInt(recordTime.Unix(), 10)
-    return ctx.GetStub().PutState(ticketID, ticketRecordJSON)
+	recordTime, err := getDeterministicTimestamp(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get record timestamp: %v", err)
+	}
+	
+	ticketRecord := struct {
+		ClientID     string    `json:"clientID"`
+		ServiceID    string    `json:"serviceID"`
+		Timestamp    time.Time `json:"timestamp"`
+		TicketHash   string    `json:"ticketHash"`
+	}{
+		ClientID:     clientID,
+		ServiceID:    serviceID,
+		Timestamp:    recordTime,
+		TicketHash:   fmt.Sprintf("%x", sha256.Sum256(serviceTicketJSON)),
+	}
+	
+	ticketRecordJSON, err := json.Marshal(ticketRecord)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ticket record: %v", err)
+	}
+	
+	// Store the ticket record with a deterministic ID
+	ticketID := "TICKET_" + clientID + "_" + serviceID + "_" + strconv.FormatInt(recordTime.Unix(), 10)
+	return ctx.GetStub().PutState(ticketID, ticketRecordJSON)
 }
 
 // ForwardRegistrationToISV prepares and forwards client registration to ISV
