@@ -1,0 +1,6 @@
+Installed chaincodes on peer:
+Package ID: isv-fixed_1.0:d6d3d3ca2b5af154bc538b5c1943f6a47e6eafbf17e288d30c15075a5de22f1b, Label: isv-fixed_1.0
+Package ID: isv_1.0:c0299571a2b69b62d8bd6bd4902a85655420d35fb25592e92f2ad488e021ebeb, Label: isv_1.0
+Package ID: tgs-chaincode-fixed-v4:6f3e17fcbaa1e8a17bdfe6a842fcede04bffcc7793882c9dc9567a6d5f7e61d1, Label: tgs-chaincode-fixed-v4
+Package ID: as-chaincode:3af4ee82c9976526dfff228e34fef19a55909503d0d410b2b1bf00d69d50dbe6, Label: as-chaincode
+Package ID: as_1.0:8c38316298807901bcd3db6f7f29cb78cc3de054afe326fc35c4410de4f42583, Label: as_1.0

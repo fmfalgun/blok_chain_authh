@@ -1,182 +1,168 @@
-# Blockchain Authentication Framework for IoT Devices
+# Blockchain Authentication Framework
 
-This document provides instructions for deploying and using the Blockchain Authentication Framework with the existing Hyperledger Fabric network.
+This directory contains the client SDK and testing tools for the Blockchain Authentication Framework (BAF) built on Hyperledger Fabric.
 
-## Prerequisites
+## Quick Start
 
-- The Hyperledger Fabric network is already set up with three organizations (Org1, Org2, Org3)
-- Chaincodes (`as-chaincode`, `tgs-chaincode`, `isv-chaincode`) are deployed and initialized
-- Node.js and npm are installed on the system
-
-## Deployment Steps
-
-1. Create a project directory for the framework:
+To quickly set up the environment and make all scripts executable:
 
 ```bash
-mkdir -p blockchain-auth-framework/wallet
-cd blockchain-auth-framework
+chmod +x quick-setup.sh
+./quick-setup.sh
 ```
 
-2. Install the required Node.js dependencies:
+This will make all scripts executable, check the network status, and set up the test environment.
 
-```bash
-npm init -y
-npm install fabric-network fabric-ca-client
-```
+## Authentication Flow
 
-3. Copy the provided code files into the project directory:
-   - `auth-framework.js` - Main application code
-   - `connection-profile.json` - Hyperledger Fabric connection profile
+The authentication flow consists of the following steps:
 
-4. Create the wallet directory for identity management:
+1. **Client Registration**: Register a client with the Authentication Server (AS)
+2. **Device Registration**: Register an IoT device with the IoT Service Validator (ISV)
+3. **Get TGT**: Client obtains a Ticket Granting Ticket from AS
+4. **Get Service Ticket**: Client uses TGT to get a Service Ticket from Ticket Granting Server (TGS)
+5. **Access Device**: Client uses Service Ticket to access the IoT device through ISV
+6. **Close Session**: Client closes the session when done
 
-```bash
-mkdir -p wallet
-```
+## Available Scripts
 
-5. Enroll the admin user (execute inside the CLI container):
+### Testing Scripts
 
-```bash
-cd /opt/gopath/src/github.com/hyperledger/fabric/peer
-node enrollAdmin.js
-```
+- `test-authentication-flow.sh`: Tests the complete authentication flow
+- `test-rsa-keys.sh`: Tests RSA key generation and validation
+- `run-all-tests.sh`: Runs all tests and generates a comprehensive report
+- `check-network-status.sh`: Checks the status of the Hyperledger Fabric network
+- `setup-test-environment.sh`: Sets up the test environment
 
-Note: If `enrollAdmin.js` doesn't exist, create it with the following content:
+### Utility Scripts
+
+- `auth-framework.js`: Node.js SDK for the authentication framework
+- `auth-cli.sh`: CLI interface for authentication operations
+- `simple-auth.sh`: Simplified interface for authentication operations
+- `make-executable.sh`: Makes all scripts executable
+- `quick-setup.sh`: Quick setup script for the authentication framework
+
+## Using the SDK
+
+### Client Registration
 
 ```javascript
-const { Wallets } = require('fabric-network');
-const FabricCAServices = require('fabric-ca-client');
-const fs = require('fs');
-const path = require('path');
-
-async function main() {
-    try {
-        // Load the connection profile
-        const ccpPath = path.resolve(__dirname, 'connection-profile.json');
-        const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
-
-        // Create a new CA client for interacting with the CA
-        const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-        const caTLSCACerts = caInfo.tlsCACerts.path;
-        const ca = new FabricCAServices(caInfo.url, { trustedRoots: caTLSCACerts, verify: false }, caInfo.caName);
-
-        // Create a new file system wallet for managing identities
-        const walletPath = path.join(process.cwd(), 'wallet');
-        const wallet = await Wallets.newFileSystemWallet(walletPath);
-        console.log(`Wallet path: ${walletPath}`);
-
-        // Check if admin identity exists in the wallet
-        const identity = await wallet.get('admin');
-        if (identity) {
-            console.log('An identity for the admin user "admin" already exists in the wallet');
-            return;
-        }
-
-        // Enroll the admin user
-        const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
-        const x509Identity = {
-            credentials: {
-                certificate: enrollment.certificate,
-                privateKey: enrollment.key.toBytes(),
-            },
-            mspId: 'Org1MSP',
-            type: 'X.509',
-        };
-        await wallet.put('admin', x509Identity);
-        console.log('Successfully enrolled admin user "admin" and imported it into the wallet');
-
-    } catch (error) {
-        console.error(`Failed to enroll admin user "admin": ${error}`);
-        process.exit(1);
-    }
-}
-
-main();
+const authFramework = require('./auth-framework');
+authFramework.registerClient('admin', 'client1');
 ```
 
-## Usage Instructions
-
-The framework provides several commands to interact with the blockchain network:
-
-### 1. Register a Client
-
-Register a new client with the Authentication Server (AS):
-
+Or using CLI:
 ```bash
-node auth-framework.js register-client admin client1
+./auth-cli.sh register-client client1
 ```
 
-This command:
-- Registers a client with ID "client1"
-- Generates an RSA key pair for the client
-- Stores the private key locally as `client1-private.pem`
-- Registers the client's public key with the AS chaincode
+### Device Registration
 
-### 2. Register an IoT Device
-
-Register a new IoT device with the IoT Service Validator (ISV):
-
-```bash
-node auth-framework.js register-device admin device1 temperature humidity presence
+```javascript
+const authFramework = require('./auth-framework');
+authFramework.registerIoTDevice('admin', 'device1', ['temperature', 'humidity']);
 ```
 
-This command:
-- Registers a device with ID "device1"
-- Defines its capabilities (temperature, humidity, presence)
-- Generates an RSA key pair for the device
-- Stores the private key locally as `device1-private.pem`
-- Registers the device's public key with the ISV chaincode
-
-### 3. Authenticate and Access an IoT Device
-
-Authenticate a client and establish a session with an IoT device:
-
+Or using CLI:
 ```bash
-node auth-framework.js authenticate admin client1 device1
+./auth-cli.sh register-device device1 "temperature,humidity"
 ```
 
-This command walks through the complete authentication flow:
-1. Gets a Ticket Granting Ticket (TGT) from the AS
-2. Gets a Service Ticket from the TGS
-3. Authenticates with the ISV and establishes a session with the device
+### Complete Authentication
 
-### 4. Get IoT Device Data
+```javascript
+const authFramework = require('./auth-framework');
 
-Retrieve device data after successful authentication:
+// Step 1: Get TGT from AS
+const tgt = await authFramework.getTGT('admin', 'client1');
 
-```bash
-node auth-framework.js get-device-data admin client1 device1
+// Step 2: Get Service Ticket from TGS
+const serviceTicket = await authFramework.getServiceTicket('admin', 'client1', 'iotservice1');
+
+// Step 3: Access IoT device through ISV
+const accessResult = await authFramework.accessIoTDevice('admin', 'client1', 'device1');
+
+// Step 4: Get device data
+const deviceData = await authFramework.getIoTDeviceData('admin', 'client1', 'device1');
+
+// Step 5: Close session
+await authFramework.closeSession('admin', 'client1', 'device1');
 ```
 
-### 5. Close the Session
+Or using CLI:
+```bash
+./auth-cli.sh authenticate client1 device1
+```
 
-Close an active session with an IoT device:
+## Testing
+
+### Running All Tests
 
 ```bash
-node auth-framework.js close-session admin client1 device1
+./run-all-tests.sh
+```
+
+This will run all tests and generate a test report in a timestamped directory.
+
+### Running Individual Tests
+
+```bash
+./test-authentication-flow.sh
+./test-rsa-keys.sh
+```
+
+## Network Management
+
+### Checking Network Status
+
+```bash
+./check-network-status.sh
+```
+
+This will check if the Hyperledger Fabric network is running properly.
+
+### Restarting the Network
+
+If the network is not running properly, you can restart it using:
+
+```bash
+cd /home/fm/projects/blok_chain_authh
+./start-network.sh
 ```
 
 ## Troubleshooting
 
-1. **Connection Issues**: Ensure the Hyperledger Fabric network is running and all containers are healthy.
+### Client SDK Issues
 
-2. **Missing Identities**: If you encounter wallet errors, make sure you've enrolled the admin user.
+If the client SDK is not functioning properly:
 
-3. **Chaincode Errors**: Check the Docker logs for specific chaincode errors:
-   ```bash
-   docker logs <container-id>
-   ```
+```bash
+# Reset client environment
+rm -rf wallet/*.id
+rm -f *-private.pem
+rm -f *-tgt.json
+rm -f *-serviceticket-*.json
+rm -f *-session-*.txt
 
-4. **Permission Errors**: Ensure that file paths in the connection profile are correct and accessible.
+# Re-enroll admin
+node enrollAdmin.js
+```
 
-5. **Service Timeouts**: If you experience service timeouts, check the network connectivity and consider increasing the timeout values in the connection profile.
+### Network Issues
 
-## Security Considerations
+If the network is not functioning properly:
 
-1. In a production environment, private keys should be securely stored and managed.
+```bash
+# From the project root directory
+docker-compose down
+rm -rf organizations/peerOrganizations
+rm -rf organizations/ordererOrganizations
+rm -rf channel-artifacts
+./start-network.sh
+```
 
-2. The authentication flow implementation is simplified for demonstration purposes. In a real system, proper encryption and certificate validation would be implemented.
+## Documentation
 
-3. Session management should include timeouts and periodic revalidation.
-
-4. Error handling should be improved to prevent information leakage.
+For more detailed information, refer to:
+- [Blockchain Authentication Framework Documentation](../README-BAF.md)
+- [Test Plan](./blockchain-auth-test-plan.md)

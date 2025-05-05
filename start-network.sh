@@ -52,7 +52,7 @@ check_prerequisites() {
 generate_crypto() {
     print_yellow "Checking for crypto material..."
     
-    if [ ! -d "organizations/peerOrganizations" ]; then
+    if [ ! -d "crypto-config" ]; then
         print_yellow "Generating crypto material with cryptogen tool..."
         
         # Make sure the crypto-config file exists
@@ -62,7 +62,7 @@ generate_crypto() {
         fi
         
         # Run the cryptogen tool
-        cryptogen generate --config=./crypto-config.yaml --output="organizations"
+        cryptogen generate --config=./crypto-config.yaml --output="crypto-config"
         
         if [ $? -ne 0 ]; then
             print_red "Failed to generate crypto material..."
@@ -88,7 +88,7 @@ generate_channel_artifacts() {
     fi
     
     # Generate channel creation transaction
-    configtxgen -profile ThreeOrgsChannel -outputCreateChannelTx ./channel-artifacts/channel.tx -channelID chaichis-channel
+    configtxgen -profile ThreeOrgsChannel -outputCreateChannelTx ./channel-artifacts/channel.tx -channelID channel1
     
     if [ $? -ne 0 ]; then
         print_red "Failed to generate channel configuration transaction..."
@@ -96,9 +96,9 @@ generate_channel_artifacts() {
     fi
     
     # Generate anchor peer transactions for each org
-    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID chaichis-channel -asOrg Org1MSP
-    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2MSPanchors.tx -channelID chaichis-channel -asOrg Org2MSP
-    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org3MSPanchors.tx -channelID chaichis-channel -asOrg Org3MSP
+    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID channel1 -asOrg Org1MSP
+    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2MSPanchors.tx -channelID channel1 -asOrg Org2MSP
+    configtxgen -profile ThreeOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org3MSPanchors.tx -channelID channel1 -asOrg Org3MSP
     
     print_green "Channel artifacts generated."
 }
@@ -121,64 +121,64 @@ create_and_join_channel() {
     print_yellow "Creating channel and joining peers..."
     
     # Create the channel
-    docker exec cli peer channel create -o orderer.example.com:7050 -c chaichis-channel \
+    docker exec cli peer channel create -o orderer.example.com:7050 -c channel1 \
         -f /opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/channel.tx \
-        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
     
     # Join peer0.org1 to the channel
-    docker exec cli peer channel join -b chaichis-channel.block
+    docker exec cli peer channel join -b channel1.block
     
     # Join peer1.org1 to the channel
     docker exec -e CORE_PEER_ADDRESS=peer1.org1.example.com:8051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls/ca.crt \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls/ca.crt \
+        cli peer channel join -b channel1.block
     
     # Join peer2.org1 to the channel
     docker exec -e CORE_PEER_ADDRESS=peer2.org1.example.com:11051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer2.org1.example.com/tls/ca.crt \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org1.example.com/peers/peer2.org1.example.com/tls/ca.crt \
+        cli peer channel join -b channel1.block
     
     # Join peer0.org2 to the channel
     docker exec -e CORE_PEER_LOCALMSPID=Org2MSP \
         -e CORE_PEER_ADDRESS=peer0.org2.example.com:9051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
+        cli peer channel join -b channel1.block
     
     # Join peer1.org2 to the channel
     docker exec -e CORE_PEER_LOCALMSPID=Org2MSP \
         -e CORE_PEER_ADDRESS=peer1.org2.example.com:10051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
+        cli peer channel join -b channel1.block
     
     # Join peer2.org2 to the channel
     docker exec -e CORE_PEER_LOCALMSPID=Org2MSP \
         -e CORE_PEER_ADDRESS=peer2.org2.example.com:12051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer2.org2.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/peers/peer2.org2.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
+        cli peer channel join -b channel1.block
     
     # Join peer0.org3 to the channel
     docker exec -e CORE_PEER_LOCALMSPID=Org3MSP \
-        -e CORE_PEER_ADDRESS=peer0.org3.example.com:13051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_ADDRESS=peer0.org3.example.com:11051 \
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
+        cli peer channel join -b channel1.block
     
     # Join peer1.org3 to the channel
     docker exec -e CORE_PEER_LOCALMSPID=Org3MSP \
         -e CORE_PEER_ADDRESS=peer1.org3.example.com:14051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer1.org3.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/peers/peer1.org3.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
+        cli peer channel join -b channel1.block
     
     # Join peer2.org3 to the channel
     docker exec -e CORE_PEER_LOCALMSPID=Org3MSP \
         -e CORE_PEER_ADDRESS=peer2.org3.example.com:15051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer2.org3.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
-        cli peer channel join -b chaichis-channel.block
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/peers/peer2.org3.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
+        cli peer channel join -b channel1.block
     
     print_green "All peers joined the channel."
 }
@@ -188,27 +188,27 @@ update_anchor_peers() {
     print_yellow "Updating anchor peers..."
     
     # Update anchor peers for Org1
-    docker exec cli peer channel update -o orderer.example.com:7050 -c chaichis-channel \
+    docker exec cli peer channel update -o orderer.example.com:7050 -c channel1 \
         -f /opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/Org1MSPanchors.tx \
-        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
     
     # Update anchor peers for Org2
     docker exec -e CORE_PEER_LOCALMSPID=Org2MSP \
         -e CORE_PEER_ADDRESS=peer0.org2.example.com:9051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
-        cli peer channel update -o orderer.example.com:7050 -c chaichis-channel \
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp \
+        cli peer channel update -o orderer.example.com:7050 -c channel1 \
         -f /opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/Org2MSPanchors.tx \
-        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
     
     # Update anchor peers for Org3
     docker exec -e CORE_PEER_LOCALMSPID=Org3MSP \
-        -e CORE_PEER_ADDRESS=peer0.org3.example.com:13051 \
-        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt \
-        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
-        cli peer channel update -o orderer.example.com:7050 -c chaichis-channel \
+        -e CORE_PEER_ADDRESS=peer0.org3.example.com:11051 \
+        -e CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt \
+        -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp \
+        cli peer channel update -o orderer.example.com:7050 -c channel1 \
         -f /opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/Org3MSPanchors.tx \
-        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+        --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
     
     print_green "Anchor peers updated."
 }
@@ -244,9 +244,9 @@ main() {
     
     print_green "==== Chaichis Network Successfully Deployed ===="
     print_green "The network has 3 organizations with 3 peers each, all connected to a single channel."
-    print_green "Channel name: chaichis-channel"
+    print_green "Channel name: channel1"
     print_green "You can now deploy chaincode and develop applications for this network."
 }
 
-# Execute main function
+# Run the main function
 main

@@ -33,7 +33,7 @@ peer channel list
 
 # IMPORTANT: Changed port from 11051 to 13051 based on docker ps output
 export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
-export CORE_PEER_ADDRESS=peer0.org3.example.com:13051
+export CORE_PEER_ADDRESS=peer0.org3.example.com:11051
 export CORE_PEER_LOCALMSPID="Org3MSP"
 export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
 export CORE_PEER_TLS_ENABLED=true
@@ -86,7 +86,7 @@ switch_to_org3() {
     echo "Switching to Org3 peer0..."
     export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
     # IMPORTANT: Changed port from 11051 to 13051 based on docker ps output
-    export CORE_PEER_ADDRESS=peer0.org3.example.com:13051
+    export CORE_PEER_ADDRESS=peer0.org3.example.com:11051
     export CORE_PEER_LOCALMSPID="Org3MSP"
     export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
     export CORE_PEER_TLS_ENABLED=true
@@ -110,7 +110,7 @@ initialize_chaincode() {
         --tls --cafile $ORDERER_CA --isInit \
         --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles $ORG1_TLS_ROOTCERT \
         --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles $ORG2_TLS_ROOTCERT \
-        --peerAddresses peer0.org3.example.com:13051 --tlsRootCertFiles $ORG3_TLS_ROOTCERT
+        --peerAddresses peer0.org3.example.com:11051 --tlsRootCertFiles $ORG3_TLS_ROOTCERT
     
     sleep 3
     echo "$CHAINCODE_NAME initialized with multi-org endorsement"
@@ -130,7 +130,7 @@ execute_with_endorsement() {
         --tls --cafile $ORDERER_CA \
         --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles $ORG1_TLS_ROOTCERT \
         --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles $ORG2_TLS_ROOTCERT \
-        --peerAddresses peer0.org3.example.com:13051 --tlsRootCertFiles $ORG3_TLS_ROOTCERT
+        --peerAddresses peer0.org3.example.com:11051 --tlsRootCertFiles $ORG3_TLS_ROOTCERT
     
     RESPONSE=$?
     sleep 3

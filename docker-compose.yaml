@@ -13,6 +13,7 @@ volumes:
 networks:
   chaichis:
     name: chaichis_network
+    driver: bridge
 
 services:
   # Certificate Authorities
@@ -30,7 +31,7 @@ services:
       - "7054:7054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ./organizations/peerOrganizations/org1.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
+      - ./crypto-config/peerOrganizations/org1.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
     container_name: ca.org1.example.com
     networks:
       - chaichis
@@ -49,7 +50,7 @@ services:
       - "8054:7054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ./organizations/peerOrganizations/org2.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
+      - ./crypto-config/peerOrganizations/org2.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
     container_name: ca.org2.example.com
     networks:
       - chaichis
@@ -68,7 +69,7 @@ services:
       - "9054:7054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ./organizations/peerOrganizations/org3.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
+      - ./crypto-config/peerOrganizations/org3.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
     container_name: ca.org3.example.com
     networks:
       - chaichis
@@ -87,10 +88,11 @@ services:
       - "10054:7054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ./organizations/ordererOrganizations/example.com/ca/:/etc/hyperledger/fabric-ca-server-config
+      - ./crypto-config/ordererOrganizations/example.com/ca/:/etc/hyperledger/fabric-ca-server-config
     container_name: ca.orderer.example.com
     networks:
       - chaichis
+
   # Orderer
   orderer.example.com:
     container_name: orderer.example.com
@@ -99,27 +101,77 @@ services:
       - FABRIC_LOGGING_SPEC=INFO
       - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
       - ORDERER_GENERAL_LISTENPORT=7050
-      - ORDERER_GENERAL_GENESISMETHOD=file
-      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block
-      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
-      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
       - ORDERER_GENERAL_TLS_ENABLED=true
       - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
       - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
-      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
-      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_TLS_ENABLED=true
+      - ORDERER_GENERAL_CLUSTER_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_TLS_CLIENTAUTHREQUIRED=true
+      - ORDERER_GENERAL_CLUSTER_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_CLUSTER_LISTENPORT=7051
+      - ORDERER_GENERAL_CLUSTER_SERVERCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_SERVERPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
-      - ORDERER_METRICS_PROVIDER=prometheus
-      - ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:8443
+      - ORDERER_GENERAL_CLUSTER_DIALTIMEOUT=5s
+      - ORDERER_GENERAL_CLUSTER_RPCTIMEOUT=7s
+      - ORDERER_GENERAL_CLUSTER_REPLICATIONBUFFERSIZE=20971520
+      - ORDERER_GENERAL_CLUSTER_REPLICATIONPULLTIMEOUT=5s
+      - ORDERER_GENERAL_CLUSTER_REPLICATIONRETRYTIMEOUT=5s
+      - ORDERER_GENERAL_CLUSTER_REPLICATIONMAXRETRIES=12
+      - ORDERER_GENERAL_CLUSTER_SENDBUFFERSIZE=10
+      - ORDERER_GENERAL_CLUSTER_CERTEXPIRATIONWARNINGTHRESHOLD=168h
+      - ORDERER_GENERAL_CLUSTER_TLSHANDSHAKETIMESHIFT=0s
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_GENERAL_BOOTSTRAPFILE=/etc/hyperledger/fabric
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_CHANNELPARTICIPATION_MAXREQUESTBODYSIZE=1048576
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTAUTHREQUIRED=true
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_TLSHANDSHAKETIMESHIFT=0s
       - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
-    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
-    command: orderer
+      - ORDERER_METRICS_PROVIDER=prometheus
+      - ORDERER_METRICS_STATSD_ADDRESS=127.0.0.1:8125
+      - ORDERER_METRICS_STATSD_NETWORK=udp
+      - ORDERER_METRICS_STATSD_WRITEINTERVAL=30s
+      - ORDERER_METRICS_STATSD_PREFIX=
+      - ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:8443
+      - ORDERER_OPERATIONS_TLS_ENABLED=false
+      - ORDERER_OPERATIONS_TLS_PRIVATEKEY=
+      - ORDERER_OPERATIONS_TLS_CERTIFICATE=
+      - ORDERER_OPERATIONS_TLS_ROOTCAS=[]
+      - ORDERER_OPERATIONS_TLS_CLIENTAUTHREQUIRED=false
+      - ORDERER_OPERATIONS_TLS_CLIENTROOTCAS=[]
+      - ORDERER_OPERATIONS_TLS_TLSHANDSHAKETIMESHIFT=0s
+      - ORDERER_DEBUG_BROADCASTTRACEDIR=
+      - ORDERER_DEBUG_DELIVERTRACEDIR=
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_BCCSP_DEFAULT=SW
+      - ORDERER_GENERAL_BCCSP_SW_SECURITY=256
+      - ORDERER_GENERAL_BCCSP_SW_HASH=SHA2
+      - ORDERER_GENERAL_BCCSP_SW_FILEKEYSTORE_KEYSTOREPATH=
+      - ORDERER_GENERAL_AUTHENTICATION_TIMEWINDOW=15m
+      - ORDERER_GENERAL_AUTHENTICATION_NOEXPIRATIONCHECKS=false
+      - ORDERER_GENERAL_MAXRECVMSGSIZE=104857600
+      - ORDERER_GENERAL_MAXSENDMSGSIZE=104857600
+      - ORDERER_GENERAL_THROTTLING_RATE=0
+      - ORDERER_GENERAL_THROTTLING_INACTIVITYTIMEOUT=5s
+      - ORDERER_FILELEDGER_LOCATION=/var/hyperledger/production/orderer
+      - ORDERER_FILELEDGER_PREFIX=
+      - ORDERER_CONSENSUS_SNAPDIR=/var/hyperledger/production/orderer/etcdraft/snapshot
+      - ORDERER_CONSENSUS_WALDIR=/var/hyperledger/production/orderer/etcdraft/wal
     volumes:
-      - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
-      - ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp:/var/hyperledger/orderer/msp
-      - ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls:/var/hyperledger/orderer/tls
-      - orderer.example.com:/var/hyperledger/production/orderer
+      - ./crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp:/var/hyperledger/orderer/msp
+      - ./crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls:/var/hyperledger/orderer/tls
+      - ./channel-artifacts:/var/hyperledger/orderer/channel-artifacts
     ports:
       - 7050:7050
       - 7053:7053
@@ -154,8 +206,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org1"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls:/etc/hyperledger/fabric/tls
       - peer0.org1.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -191,8 +243,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer1org1"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls:/etc/hyperledger/fabric/tls
       - peer1.org1.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -228,8 +280,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer2org1"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org1.example.com/peers/peer2.org1.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org1.example.com/peers/peer2.org1.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer2.org1.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer2.org1.example.com/tls:/etc/hyperledger/fabric/tls
       - peer2.org1.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -266,8 +318,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org2"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls:/etc/hyperledger/fabric/tls
       - peer0.org2.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -303,8 +355,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer1org2"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls:/etc/hyperledger/fabric/tls
       - peer1.org2.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -340,8 +392,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer2org2"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org2.example.com/peers/peer2.org2.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org2.example.com/peers/peer2.org2.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer2.org2.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer2.org2.example.com/tls:/etc/hyperledger/fabric/tls
       - peer2.org2.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -365,12 +417,12 @@ services:
       - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
       - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
       - CORE_PEER_ID=peer0.org3.example.com
-      - CORE_PEER_ADDRESS=peer0.org3.example.com:13051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:13051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org3.example.com:13052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:13052
+      - CORE_PEER_ADDRESS=peer0.org3.example.com:11051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:11051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org3.example.com:11052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:11052
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer1.org3.example.com:14051
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org3.example.com:13051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org3.example.com:11051
       - CORE_PEER_LOCALMSPID=Org3MSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
       - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:9449
@@ -378,13 +430,13 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org3"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls:/etc/hyperledger/fabric/tls
       - peer0.org3.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
     ports:
-      - 13051:13051
+      - 11051:11051
       - 9449:9449
     networks:
       - chaichis
@@ -406,7 +458,7 @@ services:
       - CORE_PEER_LISTENADDRESS=0.0.0.0:14051
       - CORE_PEER_CHAINCODEADDRESS=peer1.org3.example.com:14052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:14052
-      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org3.example.com:13051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org3.example.com:11051
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.org3.example.com:14051
       - CORE_PEER_LOCALMSPID=Org3MSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
@@ -415,8 +467,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer1org3"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org3.example.com/peers/peer1.org3.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org3.example.com/peers/peer1.org3.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer1.org3.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer1.org3.example.com/tls:/etc/hyperledger/fabric/tls
       - peer1.org3.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -443,7 +495,7 @@ services:
       - CORE_PEER_LISTENADDRESS=0.0.0.0:15051
       - CORE_PEER_CHAINCODEADDRESS=peer2.org3.example.com:15052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:15052
-      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org3.example.com:13051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org3.example.com:11051
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer2.org3.example.com:15051
       - CORE_PEER_LOCALMSPID=Org3MSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
@@ -452,8 +504,8 @@ services:
       - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer2org3"}
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./organizations/peerOrganizations/org3.example.com/peers/peer2.org3.example.com/msp:/etc/hyperledger/fabric/msp
-      - ./organizations/peerOrganizations/org3.example.com/peers/peer2.org3.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer2.org3.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer2.org3.example.com/tls:/etc/hyperledger/fabric/tls
       - peer2.org3.example.com:/var/hyperledger/production
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
@@ -463,7 +515,7 @@ services:
     networks:
       - chaichis
 
-  # CLI for administering the network
+  # CLI
   cli:
     container_name: cli
     image: hyperledger/fabric-tools:latest
@@ -477,22 +529,15 @@ services:
       - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
       - CORE_PEER_LOCALMSPID=Org1MSP
       - CORE_PEER_TLS_ENABLED=true
-      - CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.crt
-      - CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.key
-      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
-      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+      - CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: /bin/bash
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
-      - ./chaincodes:/opt/gopath/src/github.com/hyperledger/fabric-samples/chaincode
+      - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto-config
       - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
-      - ./organizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
-      - ./scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts
-    depends_on:
-      - peer0.org1.example.com
-      - peer0.org2.example.com
-      - peer0.org3.example.com
-      - orderer.example.com
     networks:
       - chaichis

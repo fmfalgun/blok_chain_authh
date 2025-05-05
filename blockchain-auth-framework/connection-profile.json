@@ -62,7 +62,7 @@
             }
         },
         "peer0.org3.example.com": {
-            "url": "grpcs://localhost:13051",
+            "url": "grpcs://localhost:11051",
             "tlsCACerts": {
                 "path": "./certs/org3/ca.crt"
             },

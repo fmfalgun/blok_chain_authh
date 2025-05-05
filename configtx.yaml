@@ -4,7 +4,7 @@ Organizations:
     - &OrdererOrg
         Name: OrdererOrg
         ID: OrdererMSP
-        MSPDir: ./organizations/ordererOrganizations/example.com/msp
+        MSPDir: crypto-config/ordererOrganizations/example.com/msp
         Policies:
             Readers:
                 Type: Signature
@@ -15,11 +15,13 @@ Organizations:
             Admins:
                 Type: Signature
                 Rule: "OR('OrdererMSP.admin')"
+        OrdererEndpoints:
+            - orderer.example.com:7050
 
     - &Org1
         Name: Org1MSP
         ID: Org1MSP
-        MSPDir: ./organizations/peerOrganizations/org1.example.com/msp
+        MSPDir: crypto-config/peerOrganizations/org1.example.com/msp
         Policies:
             Readers:
                 Type: Signature
@@ -40,7 +42,7 @@ Organizations:
     - &Org2
         Name: Org2MSP
         ID: Org2MSP
-        MSPDir: ./organizations/peerOrganizations/org2.example.com/msp
+        MSPDir: crypto-config/peerOrganizations/org2.example.com/msp
         Policies:
             Readers:
                 Type: Signature
@@ -61,7 +63,7 @@ Organizations:
     - &Org3
         Name: Org3MSP
         ID: Org3MSP
-        MSPDir: ./organizations/peerOrganizations/org3.example.com/msp
+        MSPDir: crypto-config/peerOrganizations/org3.example.com/msp
         Policies:
             Readers:
                 Type: Signature
@@ -77,7 +79,7 @@ Organizations:
                 Rule: "OR('Org3MSP.peer')"
         AnchorPeers:
             - Host: peer0.org3.example.com
-              Port: 13051
+              Port: 11051
 
 Capabilities:
     Channel: &ChannelCapabilities
@@ -120,6 +122,12 @@ Orderer: &OrdererDefaults
         AbsoluteMaxBytes: 99 MB
         PreferredMaxBytes: 512 KB
     Organizations:
+    EtcdRaft:
+        Consenters:
+            - Host: orderer.example.com
+              Port: 7050
+              ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+              ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
     Policies:
         Readers:
             Type: ImplicitMeta
@@ -133,12 +141,6 @@ Orderer: &OrdererDefaults
         BlockValidation:
             Type: ImplicitMeta
             Rule: "ANY Writers"
-    EtcdRaft:
-        Consenters:
-            - Host: orderer.example.com
-              Port: 7050
-              ClientTLSCert: ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
-              ServerTLSCert: ./organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
     Capabilities:
         <<: *OrdererCapabilities
 
@@ -163,12 +165,17 @@ Profiles:
             <<: *OrdererDefaults
             Organizations:
                 - *OrdererOrg
+            Capabilities:
+                <<: *OrdererCapabilities
         Consortiums:
             SampleConsortium:
                 Organizations:
                     - *Org1
                     - *Org2
                     - *Org3
+        Capabilities:
+            <<: *ChannelCapabilities
+
     ThreeOrgsChannel:
         Consortium: SampleConsortium
         <<: *ChannelDefaults
@@ -180,3 +187,9 @@ Profiles:
                 - *Org3
             Capabilities:
                 <<: *ApplicationCapabilities
+        Orderer:
+            <<: *OrdererDefaults
+            Organizations:
+                - *OrdererOrg
+            Capabilities:
+                <<: *OrdererCapabilities

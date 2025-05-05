@@ -1,0 +1,35 @@
+# Commands to run for setting up and testing the Blockchain Authentication Framework
+
+# 1. Make run-executable.sh executable and run it to make all other scripts executable
+chmod +x /home/fm/projects/blok_chain_authh/blockchain-auth-framework/run-executable.sh
+cd /home/fm/projects/blok_chain_authh/blockchain-auth-framework/
+./run-executable.sh
+
+# 2. Run quick-setup.sh to check network status and set up the test environment
+./quick-setup.sh
+
+# 3. Run authentication flow tests
+./test-authentication-flow.sh
+
+# 4. Run RSA key tests
+./test-rsa-keys.sh
+
+# 5. Run all tests and generate a comprehensive report
+./run-all-tests.sh
+
+# If you need to restart the network
+# cd /home/fm/projects/blok_chain_authh
+# ./start-network.sh
+
+# Additional commands:
+# Register a client:
+# ./auth-cli.sh register-client client1
+
+# Register a device:
+# ./auth-cli.sh register-device device1 "temperature,humidity"
+
+# Authenticate and access device:
+# ./auth-cli.sh authenticate client1 device1
+
+# Check network status:
+# ./check-network-status.sh

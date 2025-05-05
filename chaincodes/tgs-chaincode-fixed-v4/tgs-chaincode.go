@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
@@ -278,8 +277,11 @@ func (s *TGSChaincode) getPublicKey(ctx contractapi.TransactionContextInterface,
 // This implements the "Process Registration of Org1" operation
 func (s *TGSChaincode) ProcessRegistrationFromAS(ctx contractapi.TransactionContextInterface, encryptedTGT string) error {
 	// Debug log for input
-	fmt.Printf("Processing registration with TGT (first 50 chars): %s...\n", 
-		encryptedTGT[:min(50, len(encryptedTGT)))])
+	if len(encryptedTGT) > 50 {
+		fmt.Printf("Processing registration with TGT (first 50 chars): %s...\n", encryptedTGT[:50])
+	} else {
+		fmt.Printf("Processing registration with TGT: %s\n", encryptedTGT)
+	}
 
 	// Decode the base64 encoded encrypted TGT
 	tgtBytes, err := base64.StdEncoding.DecodeString(encryptedTGT)
@@ -311,8 +313,12 @@ func (s *TGSChaincode) ProcessRegistrationFromAS(ctx contractapi.TransactionCont
 	}
 	
 	// Log the decrypted data
-	fmt.Printf("Decrypted TGT bytes (first 50 chars): %s...\n", 
-		string(decryptedTGTBytes)[:min(50, len(string(decryptedTGTBytes)))])
+	decryptedStr := string(decryptedTGTBytes)
+	if len(decryptedStr) > 50 {
+		fmt.Printf("Decrypted TGT bytes (first 50 chars): %s...\n", decryptedStr[:50])
+	} else {
+		fmt.Printf("Decrypted TGT bytes: %s\n", decryptedStr)
+	}
 	
 	// Parse the decrypted TGT
 	var tgt TGT

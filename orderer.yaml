@@ -1,0 +1,81 @@
+General:
+  ListenAddress: 0.0.0.0
+  ListenPort: 7050
+  TLS:
+    Enabled: true
+    PrivateKey: /var/hyperledger/orderer/tls/server.key
+    Certificate: /var/hyperledger/orderer/tls/server.crt
+    RootCAs:
+      - /var/hyperledger/orderer/tls/ca.crt
+    ClientAuthRequired: false
+  Keepalive:
+    ServerMinInterval: 60s
+    ServerInterval: 7200s
+    ServerTimeout: 20s
+  Backoff:
+    BaseDelay: 1s
+    Multiplier: 1.6
+    MaxDelay: 2m
+  MaxRecvMsgSize: 104857600
+  MaxSendMsgSize: 104857600
+  Throttling:
+    Rate: 0
+    InactivityTimeout: 5s
+  Cluster:
+    SendBufferSize: 100
+  LocalMSPDir: /var/hyperledger/orderer/msp
+  LocalMSPID: OrdererMSP
+  Profile:
+    Enabled: false
+    Address: 0.0.0.0:6060
+  BCCSP:
+    Default: SW
+    SW:
+      Hash: SHA2
+      Security: 256
+  Authentication:
+    TimeWindow: 15m
+  GenesisMethod: file
+  GenesisFile: /var/hyperledger/orderer/orderer.genesis.block
+
+FileLedger:
+  Location: /var/hyperledger/production/orderer
+
+Debug:
+  BroadcastTraceDir:
+  DeliverTraceDir:
+
+Operations:
+  ListenAddress: 0.0.0.0:8443
+  TLS:
+    Enabled: false
+    Certificate:
+    PrivateKey:
+    ClientAuthRequired: false
+    ClientRootCAs: []
+
+Metrics:
+  Provider: disabled
+  Statsd:
+    Network: udp
+    Address: 127.0.0.1:8125
+    WriteInterval: 30s
+    Prefix:
+
+Admin:
+  ListenAddress: 0.0.0.0:7053
+  TLS:
+    Enabled: true
+    Certificate: /var/hyperledger/orderer/tls/server.crt
+    PrivateKey: /var/hyperledger/orderer/tls/server.key
+    ClientAuthRequired: true
+    ClientRootCAs:
+      - /var/hyperledger/orderer/tls/ca.crt
+
+ChannelParticipation:
+  Enabled: true
+  MaxRequestBodySize: 1 MB
+
+Consensus:
+  WALDir: /var/hyperledger/production/orderer/etcdraft/wal
+  SnapDir: /var/hyperledger/production/orderer/etcdraft/snapshot 
