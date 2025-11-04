@@ -1,0 +1,107 @@
+{
+  "dashboard": {
+    "title": "Hyperledger Fabric Overview",
+    "tags": ["fabric", "blockchain"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Peers Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{group=\"peers\"}"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      },
+      {
+        "id": 2,
+        "title": "Orderer Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{group=\"orderer\"}"
+          }
+        ],
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      },
+      {
+        "id": 3,
+        "title": "Ledger Height",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ledger_blockchain_height"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 12,
+          "h": 6
+        }
+      },
+      {
+        "id": 4,
+        "title": "Transaction Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ledger_transaction_count[5m])"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 10,
+          "w": 12,
+          "h": 6
+        }
+      },
+      {
+        "id": 5,
+        "title": "Chaincode Execution Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(chaincode_execute_duration_sum[5m]) / rate(chaincode_execute_duration_count[5m])"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 6
+        }
+      },
+      {
+        "id": 6,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(grpc_server_handled_total{grpc_code!=\"OK\"}[5m])"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 22,
+          "w": 12,
+          "h": 6
+        }
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

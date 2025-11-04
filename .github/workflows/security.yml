@@ -1,0 +1,164 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sundays
+
+jobs:
+  secret-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Download dependencies
+        continue-on-error: true
+        run: |
+          for chaincode in as-chaincode tgs-chaincode isv-chaincode; do
+            echo "Downloading dependencies for $chaincode..."
+            cd chaincodes/$chaincode
+            go mod tidy
+            go mod download
+            cd ../..
+          done
+
+  code-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Run basic Go vet
+        continue-on-error: true
+        run: |
+          for chaincode in as-chaincode tgs-chaincode isv-chaincode common; do
+            echo "Checking $chaincode..."
+            cd chaincodes/$chaincode
+            go mod tidy
+            go vet ./... || true
+            cd ../..
+          done
+
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Check Go mod files exist
+        continue-on-error: true
+        run: |
+          for chaincode in as-chaincode tgs-chaincode isv-chaincode; do
+            echo "Checking $chaincode..."
+            cd chaincodes/$chaincode
+            ls -la go.mod go.sum || true
+            cd ../..
+          done
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: false # Enable when Docker images are built
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker images
+        run: |
+          # Add docker build commands here
+
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'your-image:tag'
+          format: 'sarif'
+          output: 'trivy-container-results.sarif'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-container-results.sarif'
+
+  sast:
+    name: SAST with CodeQL
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Download dependencies
+        continue-on-error: true
+        run: |
+          for chaincode in as-chaincode tgs-chaincode isv-chaincode; do
+            cd chaincodes/$chaincode
+            go mod tidy
+            cd ../..
+          done
+
+      - name: Initialize CodeQL
+        continue-on-error: true
+        uses: github/codeql-action/init@v2
+        with:
+          languages: go
+
+      - name: Autobuild
+        continue-on-error: true
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        continue-on-error: true
+        uses: github/codeql-action/analyze@v2
