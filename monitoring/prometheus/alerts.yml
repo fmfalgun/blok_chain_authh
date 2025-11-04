@@ -1,0 +1,93 @@
+groups:
+  - name: fabric_alerts
+    interval: 30s
+    rules:
+      # Peer Down Alert
+      - alert: PeerDown
+        expr: up{group="peers"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fabric Peer {{ $labels.instance }} is down"
+          description: "Peer {{ $labels.instance }} in {{ $labels.org }} has been down for more than 1 minute."
+
+      # Orderer Down Alert
+      - alert: OrdererDown
+        expr: up{group="orderer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fabric Orderer {{ $labels.instance }} is down"
+          description: "Orderer {{ $labels.instance }} has been down for more than 1 minute."
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(grpc_server_handled_total{grpc_code!="OK"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.instance }}"
+          description: "Error rate is above 5% for {{ $labels.instance }}."
+
+      # High Block Processing Time
+      - alert: HighBlockProcessingTime
+        expr: rate(consensus_etcdraft_commit_duration_sum[5m]) / rate(consensus_etcdraft_commit_duration_count[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High block processing time on orderer"
+          description: "Average block processing time is above 1 second."
+
+      # Ledger Height Divergence
+      - alert: LedgerHeightDivergence
+        expr: abs(max(ledger_blockchain_height) - min(ledger_blockchain_height)) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ledger height divergence detected"
+          description: "Peers have divergent ledger heights (difference > 10 blocks)."
+
+      # High Chaincode Execution Time
+      - alert: HighChaincodeExecutionTime
+        expr: rate(chaincode_execute_duration_sum[5m]) / rate(chaincode_execute_duration_count[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High chaincode execution time"
+          description: "Average chaincode execution time is above 2 seconds."
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Available disk space is below 20%."
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 85%."
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80%."

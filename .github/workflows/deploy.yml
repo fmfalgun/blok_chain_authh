@@ -1,0 +1,153 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  build:
+    name: Build Release Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build all chaincodes
+        run: |
+          for chaincode in as-chaincode tgs-chaincode isv-chaincode; do
+            cd chaincodes/$chaincode
+            go build -v -o ../../bin/$chaincode ./...
+            cd ../..
+          done
+
+      - name: Package chaincodes
+        run: |
+          mkdir -p release
+          for chaincode in as-chaincode tgs-chaincode isv-chaincode; do
+            cd chaincodes/$chaincode
+            tar czf ../../release/$chaincode-${GITHUB_REF_NAME}.tar.gz .
+            cd ../..
+          done
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum *.tar.gz > checksums.txt
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-packages
+          path: release/
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-packages
+          path: release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'staging' || (startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'beta'))
+    environment:
+      name: staging
+      url: https://staging.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-packages
+          path: release/
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add actual deployment commands here
+          # This could involve:
+          # - Copying chaincode packages to staging servers
+          # - Running deployment scripts
+          # - Upgrading chaincodes on staging network
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying staging deployment..."
+          # Add verification commands here
+
+  deploy-production:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'production' || (startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'beta'))
+    environment:
+      name: production
+      url: https://production.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-packages
+          path: release/
+
+      - name: Create backup
+        run: |
+          echo "Creating backup of current production deployment..."
+          # Add backup commands here
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add actual deployment commands here
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying production deployment..."
+          # Add verification commands here
+
+      - name: Notify deployment
+        run: |
+          echo "Sending deployment notifications..."
+          # Add notification commands (Slack, email, etc.)

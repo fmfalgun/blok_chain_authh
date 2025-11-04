@@ -1,0 +1,62 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'fabric-monitor'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  - 'alerts.yml'
+
+scrape_configs:
+  # Fabric Orderer
+  - job_name: 'orderer'
+    static_configs:
+      - targets: ['orderer.example.com:8443']
+        labels:
+          group: 'orderer'
+
+  # Fabric Peers - Org1
+  - job_name: 'peer-org1'
+    static_configs:
+      - targets:
+          - 'peer0.org1.example.com:9443'
+          - 'peer1.org1.example.com:9444'
+        labels:
+          group: 'peers'
+          org: 'org1'
+
+  # Fabric Peers - Org2
+  - job_name: 'peer-org2'
+    static_configs:
+      - targets:
+          - 'peer0.org2.example.com:9445'
+          - 'peer1.org2.example.com:9446'
+        labels:
+          group: 'peers'
+          org: 'org2'
+
+  # Fabric Peers - Org3
+  - job_name: 'peer-org3'
+    static_configs:
+      - targets:
+          - 'peer0.org3.example.com:9447'
+          - 'peer1.org3.example.com:9448'
+        labels:
+          group: 'peers'
+          org: 'org3'
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter (for host metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']

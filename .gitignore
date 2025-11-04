@@ -1,4 +1,7 @@
-# Hyperledger Fabric specific
+# Hyperledger Fabric
+network/crypto-config/
+network/channel-artifacts/
+network/ledgers/
 /channel-artifacts/*.block
 /channel-artifacts/*.tx
 /organizations/fabric-ca/*/msp/keystore/*
@@ -7,18 +10,40 @@
 /organizations/ordererOrganizations/*/orderers/*/msp/keystore/*
 /organizations/peerOrganizations/*/peers/*/msp/keystore/*
 /organizations/peerOrganizations/*/users/*/msp/keystore/*
+*.tar.gz
+*.block
+*.tx
 
-# Docker volumes
+# Docker
+.env
+docker-compose.override.yml
 /volumes
+.dockerignore
 
 # Generated folders
 /ledgers
 /ledgers-backup
 
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+
 # Node.js dependencies
 node_modules/
 npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 package-lock.json
+.npm
+.eslintcache
 
 # IDE files
 .idea/
@@ -26,12 +51,33 @@ package-lock.json
 *.swo
 .DS_Store
 .vscode/
+*~
 
 # Log files
 *.log
+*.log.*
+logs/
 
-# Docker files
-.dockerignore
+# Test coverage
+coverage/
+*.coverprofile
 
-# Chaincode packaged files
-*.tar.gz
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Certificates and Keys (except templates)
+*.pem
+*.key
+*.crt
+!network/config/templates/*.pem
+
+# Monitoring data
+monitoring/prometheus/data/
+monitoring/grafana/data/
+
+# Build artifacts
+bin/
+build/
+dist/
