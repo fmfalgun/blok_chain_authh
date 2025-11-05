@@ -1,0 +1,23 @@
+{
+  "name": "iot-device-simulator",
+  "version": "1.0.0",
+  "description": "IoT Temperature Sensor Simulator for Blockchain Authentication Demo",
+  "main": "device-simulator.js",
+  "scripts": {
+    "start": "node device-simulator.js",
+    "register": "node register-device.js",
+    "test": "node test-connection.js"
+  },
+  "keywords": ["iot", "blockchain", "hyperledger-fabric", "temperature-sensor"],
+  "author": "Blockchain IoT Demo",
+  "license": "MIT",
+  "dependencies": {
+    "fabric-network": "^2.2.20",
+    "fabric-ca-client": "^2.2.20",
+    "js-yaml": "^4.1.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.50.0"
+  }
+}
