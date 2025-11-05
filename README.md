@@ -249,12 +249,267 @@ make verify              # Verify network status
 
 ## 📚 Documentation
 
+### Quick Reference
 - **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** - Detailed explanation of project internals
 - **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - In-depth technical guide
 - **[Architecture](docs/architecture/authentication-flow.md)** - System design
 - **[API Reference](docs/api/chaincode-api.md)** - Complete API docs
 - **[Production Deployment](docs/deployment/PRODUCTION_DEPLOYMENT.md)** - Deploy guide
 - **[Troubleshooting](docs/troubleshooting/common-issues.md)** - Common issues
+
+### 📖 Complete Documentation Roadmap
+
+This repository has comprehensive documentation in every directory. Follow this path to gain complete understanding:
+
+#### Level 1: Getting Started (You Are Here!)
+**Current**: [Main README](README.md) - Overview, quick start, basic usage
+
+**What you learned**: How to install, start the network, deploy chaincodes, and run basic operations
+
+**Next Step**: Choose your path based on your goal:
+- **Want to understand how it works?** → Go to [HOW_IT_WORKS.md](HOW_IT_WORKS.md)
+- **Want to develop/extend the system?** → Go to [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+- **Want to explore the code structure?** → Continue to Level 2 below
+
+---
+
+#### Level 2: Project Understanding
+
+##### Path A: How It Works (Conceptual Understanding)
+1. **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** (10,000 words)
+   - System architecture and authentication flow
+   - Data structures and chaincode internals
+   - Security mechanisms and state management
+   - **Time**: 30-45 minutes
+   - **Next**: Understanding the implementation → [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+
+##### Path B: Developer Guide (Technical Deep-Dive)
+2. **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** (12,000 words)
+   - Function-by-function code breakdown
+   - Design patterns and best practices
+   - Testing strategies and debugging
+   - **Time**: 45-60 minutes
+   - **Next**: Explore specific components → Level 3
+
+---
+
+#### Level 3: Component Deep-Dive
+
+After understanding the big picture, dive into specific components:
+
+##### 3A: Chaincodes (The Core Logic)
+**Start**: [chaincodes/README.md](chaincodes/README.md) - Overview of all three chaincodes
+
+Then explore each chaincode in order (following the authentication flow):
+
+1. **[chaincodes/as-chaincode/README.md](chaincodes/as-chaincode/README.md)** (~5,000 words)
+   - Authentication Server - Device registration and TGT issuance
+   - Functions: RegisterDevice, Authenticate, GetDevice, RevokeDevice
+   - Security features, integration patterns
+   - **Time**: 20-30 minutes
+
+2. **[chaincodes/tgs-chaincode/README.md](chaincodes/tgs-chaincode/README.md)** (~4,800 words)
+   - Ticket Granting Server - Service ticket issuance
+   - Functions: RegisterService, IssueServiceTicket, ValidateServiceTicket
+   - Cross-chaincode communication with AS
+   - **Time**: 20-30 minutes
+
+3. **[chaincodes/isv-chaincode/README.md](chaincodes/isv-chaincode/README.md)** (~5,000 words)
+   - IoT Service Validator - Access validation and session management
+   - Functions: ValidateAccess, TerminateSession, GetAccessLogs
+   - Audit logging and session tracking
+   - **Time**: 20-30 minutes
+
+4. **[chaincodes/common/README.md](chaincodes/common/README.md)** (~2,800 words)
+   - Shared utilities used by all chaincodes
+   - Validation, rate limiting, audit logging, cryptographic utilities
+   - **Time**: 15-20 minutes
+
+**Total Chaincodes Time**: ~2 hours
+
+---
+
+##### 3B: Network Infrastructure
+**Start**: [network/README.md](network/README.md) - Network overview
+
+Then explore network components:
+
+1. **[network/config/README.md](network/config/README.md)** (~6,000 words)
+   - `crypto-config.yaml` - PKI structure and certificate generation
+   - `configtx.yaml` - Channel configuration and consensus
+   - `docker-compose-network.yaml` - Container orchestration
+   - **Time**: 30-40 minutes
+   - **What you'll learn**: How to configure Fabric networks, what each config parameter means
+
+2. **[network/scripts/README.md](network/scripts/README.md)** (~6,000 words)
+   - `network.sh` - Network lifecycle automation
+   - `deploy-chaincode.sh` - Chaincode deployment (Fabric 2.x lifecycle)
+   - `verify-channel.sh` - Health checks
+   - **Time**: 30-40 minutes
+   - **What you'll learn**: How to automate network operations, chaincode deployment process
+
+**Total Network Time**: ~1-1.5 hours
+
+---
+
+##### 3C: CI/CD and Automation
+**[.github/workflows/README.md](.github/workflows/README.md)** (~2,800 words)
+- Automated testing workflow (test.yml)
+- Security scanning pipeline (security.yml)
+- Deployment automation (deploy.yml)
+- **Time**: 15-20 minutes
+- **What you'll learn**: How CI/CD is set up, GitHub Actions workflows
+
+---
+
+##### 3D: Testing
+**[tests/README.md](tests/README.md)** (~800 words)
+- Unit tests, integration tests, performance tests
+- How to run and write tests
+- **Time**: 10 minutes
+- **What you'll learn**: Testing strategies for blockchain applications
+
+---
+
+##### 3E: Monitoring
+**[monitoring/README.md](monitoring/README.md)** (~1,000 words)
+- Prometheus metrics collection
+- Grafana dashboards
+- Alertmanager configuration
+- **Time**: 10-15 minutes
+- **What you'll learn**: How to monitor blockchain networks
+
+---
+
+##### 3F: Documentation Hub
+**[docs/README.md](docs/README.md)** (~500 words)
+- Central hub linking to all specialized docs
+- Architecture diagrams, API references, deployment guides
+- **Time**: 5 minutes
+- **What you'll learn**: Where to find specific documentation
+
+---
+
+#### Level 4: Specialized Topics
+
+Based on your needs, explore:
+
+**For Deployment**:
+- [docs/deployment/PRODUCTION_DEPLOYMENT.md](docs/deployment/PRODUCTION_DEPLOYMENT.md)
+- Learn: AWS/Azure/GCP deployment, Kubernetes, production hardening
+
+**For API Reference**:
+- [docs/api/chaincode-api.md](docs/api/chaincode-api.md)
+- Learn: Complete API documentation for all chaincode functions
+
+**For Architecture**:
+- [docs/architecture/authentication-flow.md](docs/architecture/authentication-flow.md)
+- Learn: System design, sequence diagrams, data flow
+
+**For Troubleshooting**:
+- [docs/troubleshooting/common-issues.md](docs/troubleshooting/common-issues.md)
+- Learn: Common problems and solutions
+
+---
+
+### 🎓 Suggested Learning Paths
+
+#### Path 1: "I Want to Use This System"
+**Time**: ~2 hours
+```
+Main README (15 min)
+↓
+HOW_IT_WORKS.md (45 min)
+↓
+chaincodes/README.md (10 min)
+↓
+chaincodes/as-chaincode/README.md (30 min)
+↓
+chaincodes/tgs-chaincode/README.md (30 min)
+↓
+chaincodes/isv-chaincode/README.md (30 min)
+```
+**Outcome**: Understand how to use the authentication system, what each function does
+
+---
+
+#### Path 2: "I Want to Deploy This to Production"
+**Time**: ~3 hours
+```
+Main README (15 min)
+↓
+HOW_IT_WORKS.md (45 min)
+↓
+network/config/README.md (40 min)
+↓
+network/scripts/README.md (40 min)
+↓
+docs/deployment/PRODUCTION_DEPLOYMENT.md (60 min)
+↓
+monitoring/README.md (15 min)
+```
+**Outcome**: Know how to configure, deploy, and monitor in production
+
+---
+
+#### Path 3: "I Want to Develop/Extend This System"
+**Time**: ~4-5 hours
+```
+Main README (15 min)
+↓
+DEVELOPER_GUIDE.md (60 min)
+↓
+All chaincode READMEs (2 hours)
+↓
+chaincodes/common/README.md (20 min)
+↓
+network/config/README.md (40 min)
+↓
+network/scripts/README.md (40 min)
+↓
+tests/README.md (10 min)
+↓
+.github/workflows/README.md (20 min)
+```
+**Outcome**: Deep understanding of code, able to add features and fix bugs
+
+---
+
+#### Path 4: "I Want to Build My Own Fabric Project"
+**Time**: ~5-6 hours (complete path)
+```
+Complete Path 3 above
+↓
+docs/architecture/authentication-flow.md (30 min)
+↓
+docs/api/chaincode-api.md (30 min)
+↓
+docs/deployment/PRODUCTION_DEPLOYMENT.md (60 min)
+```
+**Outcome**: Complete understanding, able to replicate Fabric setup for own use case
+
+---
+
+### 📊 Documentation Statistics
+
+- **Total Documentation**: ~50,000 words
+- **Number of READMEs**: 15 interconnected guides
+- **Code Examples**: 100+ practical examples
+- **Coverage**: Every directory explained with why/what/how
+
+### 🔗 Quick Navigation
+
+**By Topic**:
+- **Blockchain Basics**: [HOW_IT_WORKS.md](HOW_IT_WORKS.md) → [network/config/README.md](network/config/README.md)
+- **Chaincode Development**: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) → [chaincodes/](chaincodes/README.md)
+- **DevOps**: [network/scripts/README.md](network/scripts/README.md) → [.github/workflows/README.md](.github/workflows/README.md)
+- **Production**: [docs/deployment/PRODUCTION_DEPLOYMENT.md](docs/deployment/PRODUCTION_DEPLOYMENT.md)
+
+**By Role**:
+- **Developers**: DEVELOPER_GUIDE.md → chaincodes/* → tests/README.md
+- **DevOps Engineers**: network/* → monitoring/README.md → .github/workflows/README.md
+- **Architects**: HOW_IT_WORKS.md → docs/architecture/* → network/config/README.md
+- **End Users**: Main README → HOW_IT_WORKS.md → docs/api/chaincode-api.md
 
 ## 🔐 Security Features
 
