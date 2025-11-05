@@ -1,0 +1,27 @@
+{
+  "deviceID": "sensor-001",
+  "ownerID": "user_alice",
+  "deviceName": "Temperature Sensor 001",
+  "temperature": {
+    "baseTemp": 22,
+    "amplitude": 5,
+    "noiseLevel": 0.5,
+    "cycleHours": 24,
+    "updateInterval": {
+      "min": 10,
+      "max": 30
+    }
+  },
+  "session": {
+    "duration": 300
+  },
+  "blockchain": {
+    "channelName": "authchannel",
+    "identity": "appUser",
+    "mspId": "Org1MSP",
+    "caName": "ca.org1.example.com",
+    "enrollmentID": "admin",
+    "enrollmentSecret": "adminpw",
+    "connectionProfilePath": null
+  }
+}
